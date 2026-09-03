@@ -127,6 +127,7 @@ namespace PinyinApp.Core
         private const int BaseSz = 30;      // 汉字字号（半点）= 15pt
         private const int RubySz = 15;      // 拼音字号（半点）= 7.5pt
         private const int RubyRaise = 30;   // 拼音相对基线抬升（半点）
+        private const int BodyCharSpacing = 12; // 二十分之一磅，正文字符间距 0.6pt
 
         /// <summary>
         /// 生成一段“拼音指南”排版：每个汉字使用 w:ruby，
@@ -145,7 +146,7 @@ namespace PinyinApp.Core
             {
                 if (!t.IsCJK)
                 {
-                    sb.Append(Run(t.Source, BaseSz, "22304A"));
+                    sb.Append(Run(t.Source, BaseSz, "22304A", BodyCharSpacing));
                     continue;
                 }
                 foreach (CharPinyin cp in t.Items)
@@ -168,7 +169,7 @@ namespace PinyinApp.Core
         private static string Ruby(string baseText, string rubyText)
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append("<w:r><w:ruby>");
+            sb.Append("<w:r><w:rPr><w:spacing w:val=\"").Append(BodyCharSpacing).Append("\"/></w:rPr><w:ruby>");
             sb.Append("<w:rubyPr>");
             sb.Append("<w:rubyAlign w:val=\"center\"/>");
             sb.Append("<w:hps w:val=\"").Append(RubySz).Append("\"/>");
@@ -182,7 +183,7 @@ namespace PinyinApp.Core
             return sb.ToString();
         }
 
-        private static string Run(string text, int szHalf, string color)
+        private static string Run(string text, int szHalf, string color, int spacing = 0)
         {
             StringBuilder sb = new StringBuilder();
             sb.Append("<w:r><w:rPr>");
@@ -190,6 +191,7 @@ namespace PinyinApp.Core
               .Append("\" w:hAnsi=\"").Append(LATIN).Append("\" w:cs=\"").Append(LATIN).Append("\"/>");
             sb.Append("<w:color w:val=\"").Append(color).Append("\"/>");
             sb.Append("<w:sz w:val=\"").Append(szHalf).Append("\"/><w:szCs w:val=\"").Append(szHalf).Append("\"/>");
+            if (spacing > 0) sb.Append("<w:spacing w:val=\"").Append(spacing).Append("\"/>");
             sb.Append("</w:rPr><w:t xml:space=\"preserve\">").Append(Escape(text)).Append("</w:t></w:r>");
             return sb.ToString();
         }

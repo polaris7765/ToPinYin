@@ -87,7 +87,10 @@ namespace PinyinApp.Unity
                 {
                     if (!token.IsCJK)
                     {
-                        AddInline(token.Source, ref x, ref y, ref lineH, maxW);
+                        if (mode == DisplayMode.Annotated)
+                            AddAnnotatedPlain(token.Source, ref x, ref y, ref lineH, maxW);
+                        else
+                            AddInline(token.Source, ref x, ref y, ref lineH, maxW);
                     }
                     else
                     {
@@ -165,6 +168,28 @@ namespace PinyinApp.Unity
             // 汉字（下）
             Text ch = CreateText(group, c.ToString(), CharSize, CharColor, TextAnchor.MiddleCenter);
             UiFactory.Place(ch.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(w, CharSize + 2f));
+
+            x += w + UnitGap;
+            lineH = Mathf.Max(lineH, h);
+        }
+
+        private void AddAnnotatedPlain(string text, ref float x, ref float y, ref float lineH, float maxW)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            float w = MeasureText(text, PlainSize);
+            float h = PinyinSize + 2f + CharSize + 2f;
+            if (x + w > maxW + 0.1f && x > PadX + 0.1f)
+            {
+                x = PadX;
+                y += lineH + LineGap;
+                lineH = 0f;
+            }
+
+            RectTransform group = UiFactory.CreateUI("PlainUnit", _content);
+            UiFactory.Place(group, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(x, -y), new Vector2(w, h));
+            Text plain = CreateText(group, text, PlainSize, PlainColor, TextAnchor.MiddleLeft);
+            UiFactory.Place(plain.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero,
+                new Vector2(w, CharSize + 2f));
 
             x += w + UnitGap;
             lineH = Mathf.Max(lineH, h);

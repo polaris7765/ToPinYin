@@ -89,31 +89,25 @@ namespace PinyinApp.Unity
 #if UNITY_ANDROID && !UNITY_EDITOR
         private static bool OpenAndroid(string path)
         {
-            // 允许直接传递 file:// Uri（免去声明 FileProvider）
-            try
-            {
-                using (AndroidJavaClass strict = new AndroidJavaClass("android.os.StrictMode"))
-                using (AndroidJavaObject builder = new AndroidJavaObject("android.os.StrictMode$VmPolicy$Builder"))
-                using (AndroidJavaObject policy = builder.Call<AndroidJavaObject>("build"))
-                {
-                    strict.CallStatic("setVmPolicy", policy);
-                }
-            }
-            catch { }
-
             using (AndroidJavaClass player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
             using (AndroidJavaObject activity = player.GetStatic<AndroidJavaObject>("currentActivity"))
-            using (AndroidJavaClass uriCls = new AndroidJavaClass("android.net.Uri"))
             using (AndroidJavaObject file = new AndroidJavaObject("java.io.File", path))
-            using (AndroidJavaObject uri = uriCls.CallStatic<AndroidJavaObject>("fromFile", file))
+            using (AndroidJavaClass provider = new AndroidJavaClass("com.pinyinapp.unity.PinyinFileProvider"))
+            using (AndroidJavaObject uri = provider.CallStatic<AndroidJavaObject>("getUriForFile", activity, file))
             using (AndroidJavaObject intent = new AndroidJavaObject("android.content.Intent", "android.intent.action.VIEW"))
             using (AndroidJavaClass intentCls = new AndroidJavaClass("android.content.Intent"))
+            using (AndroidJavaClass clipData = new AndroidJavaClass("android.content.ClipData"))
             {
                 intent.Call<AndroidJavaObject>("setDataAndType", uri, MimeOf(path));
                 intent.Call<AndroidJavaObject>("addFlags", 0x00000001);   // GRANT_READ_URI_PERMISSION
                 intent.Call<AndroidJavaObject>("addFlags", 0x10000000);   // NEW_TASK
+                using (AndroidJavaObject clip = clipData.CallStatic<AndroidJavaObject>("newRawUri", "导出的文档", uri))
+                {
+                    intent.Call("setClipData", clip);
+                }
                 using (AndroidJavaObject chooser = intentCls.CallStatic<AndroidJavaObject>("createChooser", intent, "打开文件"))
                 {
+                    chooser.Call<AndroidJavaObject>("addFlags", 0x00000001);
                     chooser.Call<AndroidJavaObject>("addFlags", 0x10000000);
                     activity.Call("startActivity", chooser);
                 }
