@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>中文转拼音助手</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+          Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: #f7f8fa;
+        color: #1f2937;
+      }
+      .container {
+        max-width: 900px;
+        margin: 24px auto;
+        padding: 24px;
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+      }
+      h1 {
+        margin-top: 0;
+      }
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+      textarea {
+        width: 100%;
+        min-height: 180px;
+        padding: 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        box-sizing: border-box;
+        font-size: 14px;
+        line-height: 1.6;
+        resize: vertical;
+      }
+      .actions {
+        margin: 16px 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      button {
+        border: none;
+        border-radius: 8px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .primary {
+        background: #2563eb;
+        color: #fff;
+      }
+      .success {
+        background: #16a34a;
+        color: #fff;
+      }
+      .danger {
+        background: #dc2626;
+        color: #fff;
+      }
+      .hint {
+        color: #6b7280;
+        font-size: 13px;
+      }
+    </style>
+    <script src="https://unpkg.com/pinyin-pro@3.20.4/dist/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  </head>
+  <body>
+    <main class="container">
+      <h1>中文转拼音助手</h1>
+      <p class="hint">支持将拼音转换结果全文导出为 Word / PDF 文档。</p>
+
+      <label for="sourceText">中文原文</label>
+      <textarea id="sourceText" placeholder="请输入或粘贴中文全文"></textarea>
+
+      <div class="actions">
+        <button id="convertBtn" class="primary" type="button">转换为拼音</button>
+        <button id="exportWordBtn" class="success" type="button">导出为 Word</button>
+        <button id="exportPdfBtn" class="danger" type="button">导出为 PDF</button>
+      </div>
+
+      <label for="resultText">拼音结果（可导出全文）</label>
+      <textarea id="resultText" readonly placeholder="点击“转换为拼音”后显示结果"></textarea>
+    </main>
+
+    <script>
+      const sourceText = document.getElementById("sourceText");
+      const resultText = document.getElementById("resultText");
+      const convertBtn = document.getElementById("convertBtn");
+      const exportWordBtn = document.getElementById("exportWordBtn");
+      const exportPdfBtn = document.getElementById("exportPdfBtn");
+
+      const makeFilename = (ext) => {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(
+          now.getHours()
+        )}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        return `pinyin-${stamp}.${ext}`;
+      };
+
+      const getExportText = () => {
+        const text = resultText.value.trim();
+        if (!text) {
+          alert("请先转换拼音后再导出。");
+          return "";
+        }
+        return text;
+      };
+
+      convertBtn.addEventListener("click", () => {
+        if (!window.pinyinPro || typeof window.pinyinPro.pinyin !== "function") {
+          alert("拼音转换库加载失败，请检查网络后重试。");
+          return;
+        }
+        const value = sourceText.value.trim();
+        if (!value) {
+          resultText.value = "";
+          alert("请输入中文内容。");
+          return;
+        }
+        resultText.value = window.pinyinPro.pinyin(value, {
+          toneType: "none",
+          type: "array",
+          nonZh: "consecutive",
+        }).join(" ");
+      });
+
+      exportWordBtn.addEventListener("click", () => {
+        const text = getExportText();
+        if (!text) return;
+        const escaped = text
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll("\n", "<br/>");
+        const docHtml = `<!doctype html><html><head><meta charset="UTF-8"></head><body>${escaped}</body></html>`;
+        const blob = new Blob([docHtml], {
+          type: "application/msword;charset=utf-8",
+        });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = makeFilename("doc");
+        link.click();
+        URL.revokeObjectURL(link.href);
+      });
+
+      exportPdfBtn.addEventListener("click", () => {
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+          alert("PDF 导出库加载失败，请检查网络后重试。");
+          return;
+        }
+        const text = getExportText();
+        if (!text) return;
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: "pt", format: "a4" });
+        const lines = doc.splitTextToSize(text, 520);
+        let y = 50;
+        lines.forEach((line) => {
+          if (y > 780) {
+            doc.addPage();
+            y = 50;
+          }
+          doc.text(line, 36, y);
+          y += 20;
+        });
+        doc.save(makeFilename("pdf"));
+      });
+    </script>
+  </body>
+</html>
