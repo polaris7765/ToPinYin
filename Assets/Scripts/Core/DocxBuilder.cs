@@ -81,7 +81,7 @@ namespace PinyinApp.Core
                               opts.ToneStyle == ToneStyle.Number ? "数字声调（a1 a2 a3 a4）" : "不带声调";
             sb.Append(Para("拼音风格：" + toneDesc, bold: false, 20, "595959", "center", before: 0, after: 180));
 
-            // 正文：每行 = 拼音行(上) + 汉字行(下)，注音排版
+            // 正文：注音排版（拼音在上、汉字在下，逐字上下居中对齐）
             foreach (PinyinLine line in result.Lines)
             {
                 if (line.Source.Length == 0)
@@ -89,14 +89,7 @@ namespace PinyinApp.Core
                     sb.Append(Para("", bold: false, 20, "595959", "left", before: 80, after: 80));
                     continue;
                 }
-                string pinyin = PinyinEngine.RenderLinePinyinAbove(line, opts.ToneStyle, opts.UAsV);
-                if (pinyin.Length > 0)
-                {
-                    // 拼音行（蓝色、稍小）
-                    sb.Append(Para(pinyin, bold: false, 24, "3B6EF6", "left", before: 120, after: 40));
-                }
-                // 汉字行（深色、较大）
-                sb.Append(Para(line.Source, bold: false, 30, "22304A", "left", before: 0, after: 120));
+                sb.Append(RubyPara(line, opts));
             }
 
             // 说明
@@ -127,6 +120,78 @@ namespace PinyinApp.Core
                 }
             }
             return sb.Length == 0 ? "（无内容）" : sb.ToString();
+        }
+
+        // ---------------- 注音（拼音指南）段落 ----------------
+
+        private const int BaseSz = 30;      // 汉字字号（半点）= 15pt
+        private const int RubySz = 15;      // 拼音字号（半点）= 7.5pt
+        private const int RubyRaise = 30;   // 拼音相对基线抬升（半点）
+
+        /// <summary>
+        /// 生成一段“拼音指南”排版：每个汉字使用 w:ruby，
+        /// 拼音位于汉字正上方并水平居中，Word / WPS / LibreOffice 均可正确显示与换行。
+        /// </summary>
+        private static string RubyPara(PinyinLine line, DocxOptions opts)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("<w:p><w:pPr>");
+            // 行距留足拼音空间
+            sb.Append("<w:spacing w:before=\"80\" w:after=\"80\" w:line=\"420\" w:lineRule=\"auto\"/>");
+            sb.Append("<w:jc w:val=\"left\"/>");
+            sb.Append("</w:pPr>");
+
+            foreach (PinyinToken t in line.Tokens)
+            {
+                if (!t.IsCJK)
+                {
+                    sb.Append(Run(t.Source, BaseSz, "22304A"));
+                    continue;
+                }
+                foreach (CharPinyin cp in t.Items)
+                {
+                    string py = PinyinEngine.Render(cp.Pinyin, opts.ToneStyle, opts.UAsV);
+                    if (string.IsNullOrEmpty(py))
+                    {
+                        sb.Append(Run(cp.Char.ToString(), BaseSz, "22304A"));
+                        continue;
+                    }
+                    sb.Append(Ruby(cp.Char.ToString(), py));
+                }
+            }
+
+            sb.Append("</w:p>\n");
+            return sb.ToString();
+        }
+
+        /// <summary>单个 w:ruby 元素：rt = 拼音（上），rubyBase = 汉字（下）。</summary>
+        private static string Ruby(string baseText, string rubyText)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("<w:r><w:ruby>");
+            sb.Append("<w:rubyPr>");
+            sb.Append("<w:rubyAlign w:val=\"center\"/>");
+            sb.Append("<w:hps w:val=\"").Append(RubySz).Append("\"/>");
+            sb.Append("<w:hpsRaise w:val=\"").Append(RubyRaise).Append("\"/>");
+            sb.Append("<w:hpsBaseText w:val=\"").Append(BaseSz).Append("\"/>");
+            sb.Append("<w:lid w:val=\"zh-CN\"/>");
+            sb.Append("</w:rubyPr>");
+            sb.Append("<w:rt>").Append(Run(rubyText, RubySz, "3B6EF6")).Append("</w:rt>");
+            sb.Append("<w:rubyBase>").Append(Run(baseText, BaseSz, "22304A")).Append("</w:rubyBase>");
+            sb.Append("</w:ruby></w:r>");
+            return sb.ToString();
+        }
+
+        private static string Run(string text, int szHalf, string color)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("<w:r><w:rPr>");
+            sb.Append("<w:rFonts w:ascii=\"").Append(LATIN).Append("\" w:eastAsia=\"").Append(EASTASIA)
+              .Append("\" w:hAnsi=\"").Append(LATIN).Append("\" w:cs=\"").Append(LATIN).Append("\"/>");
+            sb.Append("<w:color w:val=\"").Append(color).Append("\"/>");
+            sb.Append("<w:sz w:val=\"").Append(szHalf).Append("\"/><w:szCs w:val=\"").Append(szHalf).Append("\"/>");
+            sb.Append("</w:rPr><w:t xml:space=\"preserve\">").Append(Escape(text)).Append("</w:t></w:r>");
+            return sb.ToString();
         }
 
         // ---------------- XML 片段生成 ----------------

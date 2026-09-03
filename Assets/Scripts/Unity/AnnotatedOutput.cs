@@ -55,7 +55,11 @@ namespace PinyinApp.Unity
             Clear();
 
             RectTransform viewport = _scroll != null ? _scroll.viewport : null;
-            float viewW = (viewport != null && viewport.rect.width > 10f) ? viewport.rect.width : 500f;
+            Canvas.ForceUpdateCanvases();      // 确保 Viewport 已完成布局，宽度可靠
+            float viewW = 500f;
+            if (viewport != null && viewport.rect.width > 10f) viewW = viewport.rect.width;
+            else if (_content != null && _content.parent is RectTransform
+                     && ((RectTransform)_content.parent).rect.width > 10f) viewW = ((RectTransform)_content.parent).rect.width;
             float maxW = Mathf.Max(120f, viewW - PadX * 2f);
 
             float x = PadX, y = PadTop, lineH = 0f;

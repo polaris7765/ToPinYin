@@ -32,7 +32,14 @@ namespace PinyinApp.Unity
         private Button _btnWord;
         private Button _btnPdf;
         private Button _btnTxt;
+        private Button _btnCopy;
+        private Button _btnOpenDir;
         private Button _uvButton;
+
+        // 自适应布局尺寸（参考单位，宽固定 1080，高按屏幕比例推算，并扣除安全区）
+        private float _w = 1080f;
+        private float _h = 1920f;
+        private string _lastExportPath;
 
         // 选项
         private ToneStyle _tone = ToneStyle.Symbol;
@@ -57,10 +64,53 @@ namespace PinyinApp.Unity
 
         private void Start()
         {
-            if (_input == null) BuildUi();      // 场景未烘焙 UI 时兜底构建
+            BuildUi();                          // 始终按当前屏幕尺寸重建，保证自适应
             WireEvents();
             ApplyRuntimeFonts();
+            _lastScreen = new Vector2Int(Screen.width, Screen.height);
             StartCoroutine(LoadData());
+        }
+
+        private Vector2Int _lastScreen;
+        private float _rebuildTimer;
+
+        private void Update()
+        {
+            // 屏幕尺寸 / 方向变化时重建布局（防抖 0.25s）
+            if (_lastScreen.x != Screen.width || _lastScreen.y != Screen.height)
+            {
+                _rebuildTimer += Time.unscaledDeltaTime;
+                if (_rebuildTimer >= 0.25f)
+                {
+                    _lastScreen = new Vector2Int(Screen.width, Screen.height);
+                    _rebuildTimer = 0f;
+                    Rebuild();
+                }
+            }
+            else _rebuildTimer = 0f;
+        }
+
+        /// <summary>重建 UI 并恢复当前状态。</summary>
+        private void Rebuild()
+        {
+            string text = _input != null ? _input.text : "";
+            BuildUi();
+            WireEvents();
+            ApplyRuntimeFonts();
+            if (_input != null) _input.text = text;
+            _btnConvert.interactable = _engine != null;
+            RefreshSegments(_toneSegs, _tone == ToneStyle.Symbol ? 0 : (_tone == ToneStyle.Number ? 1 : 2));
+            RefreshSegments(_modeSegs, (int)_mode);
+            if (_uAsvBg != null) _uAsvBg.color = _uAsV ? UiFactory.Primary : UiFactory.InputBg;
+            if (_uAsvLabel != null) _uAsvLabel.color = _uAsV ? Color.white : UiFactory.TextGray;
+            StartCoroutine(DelayedRefreshOutput());
+        }
+
+        private IEnumerator DelayedRefreshOutput()
+        {
+            yield return null;                  // 等待一帧，让 Viewport 完成布局
+            yield return new WaitForEndOfFrame();
+            RefreshOutput();
         }
 
         // ================= 数据加载 =================
@@ -118,7 +168,9 @@ namespace PinyinApp.Unity
             if (scaler == null) scaler = canvas.gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = RefRes;
-            scaler.matchWidthOrHeight = 0.5f;
+            // 以宽度为基准缩放：任何屏幕宽度都恰好等于 1080 参考单位，横向永不溢出
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0f;
             UiFactory.EnsureEventSystem();
 
             RectTransform root = (RectTransform)canvas.transform;
@@ -132,63 +184,107 @@ namespace PinyinApp.Unity
             Image bg = UiFactory.CreateImage(root, null, UiFactory.Bg);
             UiFactory.Stretch(bg.rectTransform, 0, 0, 0, 0);
 
-            BuildHeader(root);
-            BuildInputCard(root);
-            BuildOutputCard(root);
+            // 安全区容器（刘海 / 圆角 / 手势条）
+            RectTransform safe = UiFactory.CreateUI("SafeArea", root);
+            UiFactory.Stretch(safe, 0, 0, 0, 0);
+            safe.gameObject.AddComponent<SafeAreaFitter>().Apply();
+
+            Vector2 size = SafeAreaFitter.SafeSizeInReference(RefRes.x);
+            _w = size.x;
+            _h = size.y;
+
+            const float pad = 24f;
+            float headerH = Mathf.Clamp(_h * 0.085f, 120f, 160f);
+            BuildHeader(safe, headerH);
+
+            float gap = 14f;
+            float avail = _h - headerH - gap * 2f - pad;      // 两张卡片可用总高
+            float inputH = Mathf.Clamp(avail * 0.48f, 420f, 660f);
+            float outputH = Mathf.Max(320f, avail - inputH);
+
+            float cardW = _w - pad * 2f;
+            BuildInputCard(safe, new Vector2(pad, -(headerH + gap)), new Vector2(cardW, inputH));
+            BuildOutputCard(safe, new Vector2(pad, -(headerH + gap + inputH + gap)), new Vector2(cardW, outputH));
         }
 
-        private void BuildHeader(Transform root)
+        private void BuildHeader(Transform root, float headerH)
         {
             RectTransform header = UiFactory.CreateUI("Header", root);
-            UiFactory.Place(header, new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, new Vector2(1080, 150));
+            // 顶部横向拉伸，宽度自适应
+            header.anchorMin = new Vector2(0f, 1f);
+            header.anchorMax = new Vector2(1f, 1f);
+            header.pivot = new Vector2(0.5f, 1f);
+            header.offsetMin = new Vector2(0f, -headerH);
+            header.offsetMax = Vector2.zero;
             Image hb = header.gameObject.AddComponent<Image>();
             hb.color = UiFactory.Primary;
 
+            float iconSize = Mathf.Min(56f, headerH * 0.4f);
+
             // 应用图标
             RectTransform icon = UiFactory.CreateUI("Icon", header);
-            UiFactory.Place(icon, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(32, -32), new Vector2(56, 56));
+            UiFactory.Place(icon, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28, -26), new Vector2(iconSize, iconSize));
             Image iconBg = icon.gameObject.AddComponent<Image>();
             iconBg.sprite = _segSprite ?? (_segSprite = UiFactory.RoundedRectFill(48, 48, 12, Color.white));
             iconBg.type = Image.Type.Sliced;
             Text iconT = UiFactory.CreateText(icon, "拼", 30, UiFactory.Primary, S(30), TextAnchor.MiddleCenter, true);
             UiFactory.Stretch(iconT.rectTransform, 0, 0, 0, 0);
 
+            float textX = 28f + iconSize + 24f;
+            float textW = _w - textX - 24f;
+
             // 标题
             Text title = UiFactory.CreateText(header, APP_NAME, 34, Color.white, S(34), TextAnchor.MiddleLeft, true);
-            UiFactory.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(110, -20), new Vector2(700, 44));
+            UiFactory.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(textX, -22), new Vector2(textW, 44));
 
-            // 副标题
+            // 副标题（宽度不足时自动换行截断）
             Text sub = UiFactory.CreateText(header, APP_SUB, 18, new Color(1f, 1f, 1f, 0.85f), S(18), TextAnchor.MiddleLeft);
-            UiFactory.Place(sub.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(110, -82), new Vector2(900, 30));
+            UiFactory.Place(sub.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(textX, -74), new Vector2(textW, 30));
+            sub.horizontalOverflow = HorizontalWrapMode.Wrap;
         }
 
-        private void BuildInputCard(Transform root)
+        private void BuildInputCard(Transform root, Vector2 pos, Vector2 size)
         {
-            RectTransform card = CreateCard(root, "InputCard", new Vector2(28, -166), new Vector2(1024, 640));
+            RectTransform card = CreateCard(root, "InputCard", pos, size);
+            float cw = size.x;
+            float innerW = cw - 48f;
 
             Text title = UiFactory.CreateText(card, "输入中文", 24, UiFactory.TextDark, S(24), TextAnchor.MiddleLeft, true);
-            UiFactory.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -24), new Vector2(240, 36));
+            UiFactory.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -20), new Vector2(240, 36));
 
             _charCount = UiFactory.CreateText(card, "0 字", 18, UiFactory.TextGray, S(18), TextAnchor.MiddleRight);
-            UiFactory.Place(_charCount.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-24, -24), new Vector2(360, 32));
+            UiFactory.Place(_charCount.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-24, -20), new Vector2(300, 32));
+
+            // 自底向上排布：按钮 → ü 开关 → 显示 → 声调
+            const float btnH = 52f, rowH = 42f, uvH = 38f;
+            float btnBottom = 20f;
+            float uvBottom = btnBottom + btnH + 14f;
+            float modeBottom = uvBottom + uvH + 12f;
+            float toneBottom = modeBottom + rowH + 12f;
+            float inputTop = 64f;
+            float inputH = Mathf.Max(120f, size.y - inputTop - (toneBottom + rowH + 14f));
 
             // 输入框
             _input = UiFactory.CreateInputField(card, S(22), 22, "请输入中文，例如：你好，世界！\n支持多行输入、多音字智能消歧。", true);
-            UiFactory.Place(_input.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -72), new Vector2(976, 320));
+            UiFactory.Place(_input.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -inputTop), new Vector2(innerW, inputH));
+
+            const float labelW = 76f;
+            float segAreaX = 24f + labelW;
+            float segW = (innerW - labelW - 20f) / 3f;
 
             // 声调风格
             Text toneLabel = UiFactory.CreateText(card, "声调", 20, UiFactory.TextDark, S(20), TextAnchor.MiddleLeft);
-            UiFactory.Place(toneLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -412), new Vector2(70, 30));
-            _toneSegs = CreateSegmentRow(card, 112, 412, new string[] { "带声调 ā", "数字 a1", "无声调" }, 230, 42, 18, OnToneChanged);
+            PlaceBottom(toneLabel.rectTransform, 24f, toneBottom, labelW, rowH);
+            _toneSegs = CreateSegmentRow(card, segAreaX, toneBottom, new string[] { "带声调 ā", "数字 a1", "无声调" }, segW, rowH, 18, OnToneChanged);
 
             // 显示方式
             Text modeLabel = UiFactory.CreateText(card, "显示", 20, UiFactory.TextDark, S(20), TextAnchor.MiddleLeft);
-            UiFactory.Place(modeLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -468), new Vector2(70, 30));
-            _modeSegs = CreateSegmentRow(card, 112, 468, new string[] { "逐字标注", "行内对照", "仅拼音" }, 230, 42, 18, OnModeChanged);
+            PlaceBottom(modeLabel.rectTransform, 24f, modeBottom, labelW, rowH);
+            _modeSegs = CreateSegmentRow(card, segAreaX, modeBottom, new string[] { "逐字标注", "行内对照", "仅拼音" }, segW, rowH, 18, OnModeChanged);
 
             // ü→v 开关
             RectTransform toggle = UiFactory.CreateUI("UVToggle", card);
-            UiFactory.Place(toggle, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -520), new Vector2(320, 38));
+            PlaceBottom(toggle, 24f, uvBottom, Mathf.Min(300f, innerW), uvH);
             _uAsvBg = toggle.gameObject.AddComponent<Image>();
             _uAsvBg.sprite = _segSprite;
             _uAsvBg.type = Image.Type.Sliced;
@@ -199,53 +295,79 @@ namespace PinyinApp.Unity
             _uAsvLabel = UiFactory.CreateText(toggle, "ü 用 v 表示", 18, _uAsV ? Color.white : UiFactory.TextGray, S(18), TextAnchor.MiddleLeft);
             UiFactory.Stretch(_uAsvLabel.rectTransform, 12, 0, 0, 0);
 
-            // 按钮
+            // 主按钮
+            float halfW = (innerW - 16f) / 2f;
             _btnConvert = UiFactory.CreateButton(card, "转 换", 24, UiFactory.Primary, Color.white, S(24), _btnSprite ?? (_btnSprite = UiFactory.RoundedRectFill(32, 32, 10, Color.white)), OnConvert);
-            UiFactory.Place(_btnConvert.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -582), new Vector2(488, 52));
+            PlaceBottom(_btnConvert.GetComponent<RectTransform>(), 24f, btnBottom, halfW, btnH);
             _btnConvert.interactable = false;
 
             _btnClear = UiFactory.CreateButton(card, "清 空", 24, UiFactory.InputBg, UiFactory.TextGray, S(24), _btnSprite, OnClear);
-            UiFactory.Place(_btnClear.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(532, -582), new Vector2(468, 52));
+            PlaceBottom(_btnClear.GetComponent<RectTransform>(), 24f + halfW + 16f, btnBottom, halfW, btnH);
         }
 
-        private void BuildOutputCard(Transform root)
+        private void BuildOutputCard(Transform root, Vector2 pos, Vector2 size)
         {
-            RectTransform card = CreateCard(root, "OutputCard", new Vector2(28, -826), new Vector2(1024, 1080));
+            RectTransform card = CreateCard(root, "OutputCard", pos, size);
+            float innerW = size.x - 48f;
 
             Text title = UiFactory.CreateText(card, "转换结果", 24, UiFactory.TextDark, S(24), TextAnchor.MiddleLeft, true);
-            UiFactory.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -24), new Vector2(240, 36));
+            UiFactory.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -20), new Vector2(240, 36));
+
+            const float statusH = 56f, btnH = 50f;
+            float statusBottom = 12f;
+            float btnBottom = statusBottom + statusH + 8f;
+            float scrollTop = 64f;
+            float scrollH = Mathf.Max(120f, size.y - scrollTop - (btnBottom + btnH + 12f));
 
             // 输出滚动区
             RectTransform content;
             ScrollRect sr = UiFactory.CreateScrollRect(card, out content);
-            UiFactory.Place(sr.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -70), new Vector2(976, 840));
+            UiFactory.Place(sr.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -scrollTop), new Vector2(innerW, scrollH));
 
             GameObject outGo = new GameObject("AnnotatedOutput");
             outGo.transform.SetParent(card, false);
             _output = outGo.AddComponent<AnnotatedOutput>();
             _output.Setup(sr, content);
 
-            // 导出按钮
-            _btnWord = UiFactory.CreateButton(card, "导出 Word", 20, UiFactory.PrimaryLight, UiFactory.Primary, S(20), _btnSprite, OnExportDocx);
-            UiFactory.Place(_btnWord.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -950), new Vector2(232, 50));
+            // 底部操作按钮：移动端不显示「打开目录」
+            bool mobile = NativeFileOpener.IsMobile;
+            int count = mobile ? 4 : 5;
+            float bgap = 10f;
+            float bw = (innerW - bgap * (count - 1)) / count;
+            float bx = 24f;
 
-            _btnPdf = UiFactory.CreateButton(card, "导出 PDF", 20, UiFactory.PrimaryLight, UiFactory.Primary, S(20), _btnSprite, OnExportPdf);
-            UiFactory.Place(_btnPdf.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(268, -950), new Vector2(232, 50));
+            _btnCopy = UiFactory.CreateButton(card, "复制结果", 19, UiFactory.Primary, Color.white, S(19), _btnSprite, OnCopy);
+            PlaceBottom(_btnCopy.GetComponent<RectTransform>(), bx, btnBottom, bw, btnH); bx += bw + bgap;
 
-            _btnTxt = UiFactory.CreateButton(card, "导出文本", 20, UiFactory.PrimaryLight, UiFactory.Primary, S(20), _btnSprite, OnExportTxt);
-            UiFactory.Place(_btnTxt.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(512, -950), new Vector2(232, 50));
+            _btnWord = UiFactory.CreateButton(card, "导出 Word", 19, UiFactory.PrimaryLight, UiFactory.Primary, S(19), _btnSprite, OnExportDocx);
+            PlaceBottom(_btnWord.GetComponent<RectTransform>(), bx, btnBottom, bw, btnH); bx += bw + bgap;
 
-            Button open = UiFactory.CreateButton(card, "打开目录", 20, UiFactory.InputBg, UiFactory.TextGray, S(20), _btnSprite, OnOpenFolder);
-            UiFactory.Place(open.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(756, -950), new Vector2(244, 50));
+            _btnPdf = UiFactory.CreateButton(card, "导出 PDF", 19, UiFactory.PrimaryLight, UiFactory.Primary, S(19), _btnSprite, OnExportPdf);
+            PlaceBottom(_btnPdf.GetComponent<RectTransform>(), bx, btnBottom, bw, btnH); bx += bw + bgap;
+
+            _btnTxt = UiFactory.CreateButton(card, "导出文本", 19, UiFactory.PrimaryLight, UiFactory.Primary, S(19), _btnSprite, OnExportTxt);
+            PlaceBottom(_btnTxt.GetComponent<RectTransform>(), bx, btnBottom, bw, btnH); bx += bw + bgap;
+
+            if (!mobile)
+            {
+                _btnOpenDir = UiFactory.CreateButton(card, "打开目录", 19, UiFactory.InputBg, UiFactory.TextGray, S(19), _btnSprite, OnOpenFolder);
+                PlaceBottom(_btnOpenDir.GetComponent<RectTransform>(), bx, btnBottom, bw, btnH);
+            }
 
             // 状态栏
             _status = UiFactory.CreateText(card, "正在初始化…", 16, UiFactory.TextGray, S(16), TextAnchor.UpperLeft);
-            UiFactory.Place(_status.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -1020), new Vector2(976, 76));
+            PlaceBottom(_status.rectTransform, 24f, statusBottom, innerW, statusH);
             _status.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _status.verticalOverflow = VerticalWrapMode.Overflow;
+            _status.verticalOverflow = VerticalWrapMode.Truncate;
 
             RefreshSegments(_toneSegs, 0);
             RefreshSegments(_modeSegs, 0);
+        }
+
+        /// <summary>以父级左下角为基准放置（便于底部对齐的自适应布局）。</summary>
+        private static void PlaceBottom(RectTransform rt, float x, float bottom, float w, float h)
+        {
+            UiFactory.Place(rt, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(x, bottom), new Vector2(w, h));
         }
 
         private RectTransform CreateCard(Transform parent, string name, Vector2 pos, Vector2 size)
@@ -266,17 +388,17 @@ namespace PinyinApp.Unity
             return card;
         }
 
-        private UiFactory.SegmentRef[] CreateSegmentRow(Transform parent, float x, float y, string[] labels, float btnW, float btnH, int fontSize, Action<int> onChanged)
+        private UiFactory.SegmentRef[] CreateSegmentRow(Transform parent, float x, float bottom, string[] labels, float btnW, float btnH, int fontSize, Action<int> onChanged)
         {
             var refs = new UiFactory.SegmentRef[labels.Length];
             for (int i = 0; i < labels.Length; i++)
             {
                 int idx = i;
-                float bx = x + i * (btnW + 12);
+                float bx = x + i * (btnW + 10f);
                 Button b = UiFactory.CreateSegmentButton(parent, labels[i], fontSize, S(fontSize),
                     _segSprite ?? (_segSprite = UiFactory.RoundedRectFill(48, 48, 10, Color.white)),
                     () => onChanged(idx), null);
-                UiFactory.Place(b.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(bx, -y), new Vector2(btnW, btnH));
+                PlaceBottom(b.GetComponent<RectTransform>(), bx, bottom, btnW, btnH);
                 refs[i] = b.GetComponent<UiFactory.SegmentRef>();
             }
             return refs;
@@ -301,6 +423,8 @@ namespace PinyinApp.Unity
             if (_btnWord != null) { _btnWord.onClick.RemoveAllListeners(); _btnWord.onClick.AddListener(OnExportDocx); }
             if (_btnPdf != null) { _btnPdf.onClick.RemoveAllListeners(); _btnPdf.onClick.AddListener(OnExportPdf); }
             if (_btnTxt != null) { _btnTxt.onClick.RemoveAllListeners(); _btnTxt.onClick.AddListener(OnExportTxt); }
+            if (_btnCopy != null) { _btnCopy.onClick.RemoveAllListeners(); _btnCopy.onClick.AddListener(OnCopy); }
+            if (_btnOpenDir != null) { _btnOpenDir.onClick.RemoveAllListeners(); _btnOpenDir.onClick.AddListener(OnOpenFolder); }
             if (_uvButton != null) { _uvButton.onClick.RemoveAllListeners(); _uvButton.onClick.AddListener(ToggleUV); }
             WireSegments(_toneSegs, OnToneChanged);
             WireSegments(_modeSegs, OnModeChanged);
@@ -396,7 +520,20 @@ namespace PinyinApp.Unity
             if (_status != null) _status.text = s;
         }
 
-        // ================= 导出 =================
+        // ================= 导出 / 复制 =================
+
+        /// <summary>复制转换结果到系统剪贴板。</summary>
+        private void OnCopy()
+        {
+            if (!EnsureResult()) return;
+            try
+            {
+                string body = PinyinEngine.RenderParenthesis(_result, _tone, _uAsV);
+                GUIUtility.systemCopyBuffer = body;
+                Status("已复制转换结果到剪贴板（" + body.Length + " 字符）。");
+            }
+            catch (Exception e) { Status("复制失败：" + e.Message); }
+        }
 
         private void OnExportDocx()
         {
@@ -406,7 +543,7 @@ namespace PinyinApp.Unity
                 DocxOptions o = new DocxOptions { ToneStyle = _tone, UAsV = _uAsV, Timestamp = NowStr() };
                 byte[] bytes = DocxBuilder.Build(_result, o);
                 string path = SaveFile("拼音对照_" + Stamp() + ".docx", bytes);
-                Status("已导出 Word：\n" + path);
+                AfterExport("Word", path);
             }
             catch (Exception e) { Status("导出 Word 失败：" + e.Message); }
         }
@@ -422,7 +559,7 @@ namespace PinyinApp.Unity
                 PdfOptions o = new PdfOptions { ToneStyle = _tone, UAsV = _uAsV, Timestamp = NowStr() };
                 byte[] bytes = PdfBuilder.Build(_result, o, fontBytes);
                 string path = SaveFile("拼音对照_" + Stamp() + ".pdf", bytes);
-                Status("已导出 PDF（" + (bytes.Length / 1024) + " KB）：\n" + path);
+                AfterExport("PDF", path);
             }
             catch (Exception e) { Status("导出 PDF 失败：" + e.Message); }
         }
@@ -435,9 +572,26 @@ namespace PinyinApp.Unity
                 string body = PinyinEngine.RenderParenthesis(_result, _tone, _uAsV);
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(body);
                 string path = SaveFile("拼音对照_" + Stamp() + ".txt", bytes);
-                Status("已导出文本：\n" + path);
+                AfterExport("文本", path);
             }
             catch (Exception e) { Status("导出文本失败：" + e.Message); }
+        }
+
+        /// <summary>导出完成：移动端自动跳转到可打开该文档的应用。</summary>
+        private void AfterExport(string kind, string path)
+        {
+            _lastExportPath = path;
+            if (NativeFileOpener.IsMobile)
+            {
+                bool ok = NativeFileOpener.OpenFile(path);
+                Status(ok
+                    ? "已导出 " + kind + "，正在用其它应用打开：\n" + Path.GetFileName(path)
+                    : "已导出 " + kind + "：\n" + path + "\n（未找到可打开该格式的应用）");
+            }
+            else
+            {
+                Status("已导出 " + kind + "：\n" + path);
+            }
         }
 
         private bool EnsureResult()
@@ -462,19 +616,23 @@ namespace PinyinApp.Unity
         {
             if (_exportDir != null) return _exportDir;
             string dir = null;
-            try
+            if (!NativeFileOpener.IsMobile)
             {
-                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                if (!string.IsNullOrEmpty(desktop))
+                try
                 {
-                    dir = Path.Combine(desktop, "中文拼音助手导出");
-                    Directory.CreateDirectory(dir);
+                    string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    if (!string.IsNullOrEmpty(desktop) && Directory.Exists(desktop))
+                    {
+                        dir = Path.Combine(desktop, "中文拼音助手导出");
+                        Directory.CreateDirectory(dir);
+                    }
                 }
+                catch { dir = null; }
             }
-            catch { }
             if (dir == null)
             {
-                dir = Path.Combine(Application.persistentDataPath, "中文拼音助手导出");
+                // 移动端使用沙盒目录（Android 可被 FileProvider/Intent 读取，iOS 可被文档控制器读取）
+                dir = Path.Combine(Application.persistentDataPath, "PinyinExport");
                 Directory.CreateDirectory(dir);
             }
             _exportDir = dir;
@@ -483,21 +641,13 @@ namespace PinyinApp.Unity
 
         private void OnOpenFolder()
         {
-            string dir = EnsureExportDir();
-#if UNITY_EDITOR
-            if (Application.platform == RuntimePlatform.OSXEditor)
-                System.Diagnostics.Process.Start("open", "\"" + dir + "\"");
-            else if (Application.platform == RuntimePlatform.WindowsEditor)
-                System.Diagnostics.Process.Start("explorer.exe", "\"" + dir + "\"");
-            else
-                Application.OpenURL("file://" + dir);
-#elif UNITY_STANDALONE_OSX
-            System.Diagnostics.Process.Start("open", "\"" + dir + "\"");
-#elif UNITY_STANDALONE_WIN
-            System.Diagnostics.Process.Start("explorer.exe", "\"" + dir + "\"");
-#else
-            Application.OpenURL("file://" + dir);
-#endif
+            if (NativeFileOpener.IsMobile)
+            {
+                // 移动端无“目录”概念：直接打开最近导出的文件
+                if (!string.IsNullOrEmpty(_lastExportPath)) NativeFileOpener.OpenFile(_lastExportPath);
+                return;
+            }
+            NativeFileOpener.OpenFolder(EnsureExportDir());
         }
 
         // ================= 工具 =================

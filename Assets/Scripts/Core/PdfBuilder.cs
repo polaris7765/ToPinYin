@@ -169,7 +169,7 @@ namespace PinyinApp.Core
                                   _opts.ToneStyle == ToneStyle.Number ? "数字声调（a1 a2 a3 a4）" : "不带声调";
                 Meta("拼音风格：" + toneDesc);
 
-                // 正文：每行 = 拼音行(上) + 汉字行(下)，注音排版
+                // 正文：注音排版（拼音在上、汉字在下，逐字上下居中对齐）
                 foreach (PinyinLine line in _result.Lines)
                 {
                     if (line.Source.Length == 0)
@@ -178,14 +178,8 @@ namespace PinyinApp.Core
                         _y -= 20f;
                         continue;
                     }
-                    string pinyin = PinyinEngine.RenderLinePinyinAbove(line, _opts.ToneStyle, _opts.UAsV);
-                    if (pinyin.Length > 0)
-                    {
-                        Body(pinyin, 12f, 0.16f, 0.37f, 0.83f, 17f);
-                        _y -= 3f;
-                    }
-                    Body(line.Source, 15f, 0.12f, 0.12f, 0.12f, 21f);
-                    _y -= 10f;
+                    AnnotatedLine(line);
+                    _y -= 6f;
                 }
 
                 Note();
@@ -235,6 +229,16 @@ namespace PinyinApp.Core
                     .Append(_g.Hex(text)).Append("> Tj ET\n");
             }
 
+            /// <summary>在指定基线位置绘制文本（不改变 _y）。</summary>
+            private void TextAt(string text, float size, float r, float g, float b, float x, float y)
+            {
+                if (string.IsNullOrEmpty(text)) return;
+                _cur.Append("BT /F1 ").Append(Fmt(size)).Append(" Tf ")
+                    .Append(Fmt(r)).Append(' ').Append(Fmt(g)).Append(' ').Append(Fmt(b)).Append(" rg ")
+                    .Append("1 0 0 1 ").Append(Fmt(x)).Append(' ').Append(Fmt(y)).Append(" Tm <")
+                    .Append(_g.Hex(text)).Append("> Tj ET\n");
+            }
+
             private void Title(string s)
             {
                 Text(s, 20f, 0.16f, 0.30f, 0.56f, PageW / 2f, true);
@@ -275,6 +279,112 @@ namespace PinyinApp.Core
                 _y -= 8f;
                 Text("注：拼音依据常见词库进行多音字消歧，未命中词语的汉字取常见读音。", 9f, 0.55f, 0.55f, 0.55f, Margin);
                 _y -= 14f;
+            }
+
+            // ---------- 注音排版（一行拼音 + 一行汉字，逐字对齐） ----------
+
+            private const float CharSize = 15f;     // 汉字字号
+            private const float PySize = 8.5f;      // 拼音字号
+            private const float PyGap = 3f;         // 拼音与汉字的垂直间距
+            private const float UnitGap = 1.5f;     // 字与字之间的水平间距
+            private const float RowPad = 9f;        // 行间距
+
+            private class Unit
+            {
+                public string Top = "";     // 拼音
+                public string Base = "";    // 汉字 / 原文片段
+                public float W;             // 列宽（含 UnitGap）
+            }
+
+            /// <summary>把一行拆成「拼音 + 汉字」列，逐列排布并按页宽自动折行。</summary>
+            private void AnnotatedLine(PinyinLine line)
+            {
+                List<Unit> units = BuildUnits(line);
+                List<Unit> row = new List<Unit>();
+                float rowW = 0f;
+
+                foreach (Unit u in units)
+                {
+                    float topW = u.Top.Length > 0 ? _g.Width(u.Top, PySize) : 0f;
+                    float baseW = _g.Width(u.Base, CharSize);
+                    u.W = Math.Max(topW, baseW) + UnitGap;
+
+                    if (rowW + u.W > ContentW && row.Count > 0)
+                    {
+                        DrawRow(row);
+                        row.Clear();
+                        rowW = 0f;
+                    }
+                    row.Add(u);
+                    rowW += u.W;
+                }
+                if (row.Count > 0) DrawRow(row);
+            }
+
+            /// <summary>绘制一行：上方拼音、下方汉字，每列水平居中对齐。</summary>
+            private void DrawRow(List<Unit> row)
+            {
+                float rowH = PySize + PyGap + CharSize + RowPad;
+                Ensure(rowH);
+
+                float pyBaseline = _y - PySize;                       // 拼音基线
+                float chBaseline = pyBaseline - PyGap - CharSize * 0.88f;   // 汉字基线
+
+                float x = Margin;
+                foreach (Unit u in row)
+                {
+                    float colW = u.W - UnitGap;
+                    if (u.Top.Length > 0)
+                    {
+                        float w = _g.Width(u.Top, PySize);
+                        TextAt(u.Top, PySize, 0.16f, 0.37f, 0.83f, x + (colW - w) / 2f, pyBaseline);
+                    }
+                    float bw = _g.Width(u.Base, CharSize);
+                    TextAt(u.Base, CharSize, 0.12f, 0.16f, 0.28f, x + (colW - bw) / 2f, chBaseline);
+                    x += u.W;
+                }
+                _y -= rowH;
+            }
+
+            /// <summary>汉字：一字一列（带拼音）；非汉字：字母/数字成词，其余逐字符成列。</summary>
+            private List<Unit> BuildUnits(PinyinLine line)
+            {
+                List<Unit> units = new List<Unit>();
+                foreach (PinyinToken t in line.Tokens)
+                {
+                    if (t.IsCJK)
+                    {
+                        foreach (CharPinyin cp in t.Items)
+                        {
+                            units.Add(new Unit
+                            {
+                                Top = PinyinEngine.Render(cp.Pinyin, _opts.ToneStyle, _opts.UAsV),
+                                Base = cp.Char.ToString()
+                            });
+                        }
+                        continue;
+                    }
+
+                    string s = t.Source;
+                    int i = 0;
+                    while (i < s.Length)
+                    {
+                        char c = s[i];
+                        if (char.IsLetterOrDigit(c))
+                        {
+                            int j = i;
+                            while (j < s.Length && char.IsLetterOrDigit(s[j])) j++;
+                            units.Add(new Unit { Base = s.Substring(i, j - i) });
+                            i = j;
+                        }
+                        else
+                        {
+                            units.Add(new Unit { Base = c.ToString() });
+                            i++;
+                        }
+                    }
+                }
+                return units;
             }
         }
 
