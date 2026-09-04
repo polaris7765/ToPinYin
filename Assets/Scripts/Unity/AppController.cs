@@ -264,9 +264,10 @@ namespace PinyinApp.Unity
             float inputTop = 64f;
             float inputH = Mathf.Max(120f, size.y - inputTop - (toneBottom + rowH + 14f));
 
-            // 输入框
-            _input = UiFactory.CreateInputField(card, S(22), 22, "请输入中文，例如：你好，世界！\n支持多行输入、多音字智能消歧。", true);
-            UiFactory.Place(_input.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -inputTop), new Vector2(innerW, inputH));
+            // 输入框（多行可滚动，根节点即滚动视口）
+            RectTransform inputRoot;
+            _input = UiFactory.CreateInputField(card, S(22), 22, "请输入中文，例如：你好，世界！\n支持多行输入、多音字智能消歧。", true, out inputRoot);
+            UiFactory.Place(inputRoot, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -inputTop), new Vector2(innerW, inputH));
 
             const float labelW = 76f;
             float segAreaX = 24f + labelW;
