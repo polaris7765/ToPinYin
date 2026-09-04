@@ -21,6 +21,10 @@ namespace PinyinApp.Unity
         private int _lastCaret = -1;
         private bool _dragScrolling;
         private float _lastMin = -1f;
+        private float _lastPreferred = -1f;
+
+        /// <summary>文本相对 Content 的上下内边距（与 UiFactory 中的 Stretch 保持一致）。</summary>
+        private const float TextPaddingY = 12f;
 
         public void Setup(InputField field, ScrollRect scroll, Text text)
         {
@@ -31,21 +35,34 @@ namespace PinyinApp.Unity
             _viewport = scroll != null ? scroll.viewport : null;
             _layout = GetComponent<LayoutElement>();
             if (_layout == null) _layout = gameObject.AddComponent<LayoutElement>();
-            _layout.preferredHeight = -1f;      // 首选高度交给 InputField / ContentSizeFitter 自行计算
+            _layout.preferredHeight = -1f;      // 首帧由 LateUpdate 依据文本高度设置
         }
 
         private void LateUpdate()
         {
             if (_field == null || _content == null || _text == null || _viewport == null) return;
 
-            // 只约束最小高度（不小于视口），实际高度由 ContentSizeFitter 依据文本首选高度决定
+            // 只约束最小高度（不小于视口）
             float minH = _viewport.rect.height;
+            bool dirty = false;
             if (!Mathf.Approximately(minH, _lastMin))
             {
                 _lastMin = minH;
                 _layout.minHeight = minH;
-                LayoutRebuilder.MarkLayoutForRebuild(_content);
+                dirty = true;
             }
+
+            // InputField 自身不提供 preferredHeight，必须按文本实际高度撑开 Content，
+            // 否则内容永远等于视口高度，滚动条不会出现（移动端尤其明显）。
+            float textH = _text.preferredHeight + TextPaddingY;
+            float want = Mathf.Max(minH, textH);
+            if (!Mathf.Approximately(want, _lastPreferred))
+            {
+                _lastPreferred = want;
+                _layout.preferredHeight = want;
+                dirty = true;
+            }
+            if (dirty) LayoutRebuilder.MarkLayoutForRebuild(_content);
 
             // 滚动条：内容超出视口时才显示
             if (_scroll != null && _scroll.verticalScrollbar != null)

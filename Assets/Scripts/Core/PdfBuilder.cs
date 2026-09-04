@@ -556,15 +556,38 @@ namespace PinyinApp.Core
 
         private static string BuildWArray(FontSubset subset, TtfFont font)
         {
-            StringBuilder sb = new StringBuilder("[ ");
+            // PDF 的 /W 数组必须使用十进制 CID（c [w1 w2 …] 形式），
+            // 用 <hex> 是非法的，会导致全部字形回退到 /DW 1000，
+            // 表现为拉丁字母/数字间距过大、拼音重叠。
+            List<ushort> cids = new List<ushort>();
+            Dictionary<ushort, int> widths = new Dictionary<ushort, int>();
             foreach (KeyValuePair<uint, ushort> kv in subset.UnicodeToNewGid)
             {
+                if (widths.ContainsKey(kv.Value)) continue;
                 ushort oldGid = font.GetGlyph(kv.Key);
                 float adv = font.GetAdvance(oldGid);
-                int w = (int)Math.Round(adv / font.UnitsPerEm * 1000f);
-                sb.Append('<').Append(kv.Value.ToString("X4")).Append("> [").Append(w).Append("] ");
+                widths[kv.Value] = (int)Math.Round(adv / font.UnitsPerEm * 1000f);
+                cids.Add(kv.Value);
             }
-            sb.Append("]");
+            cids.Sort();
+
+            StringBuilder sb = new StringBuilder("[ ");
+            int i = 0;
+            while (i < cids.Count)
+            {
+                // 连续 CID 合并为 c [w1 w2 …]，减小体积
+                int j = i + 1;
+                while (j < cids.Count && cids[j] == cids[j - 1] + 1) j++;
+                sb.Append((int)cids[i]).Append(" [");
+                for (int k = i; k < j; k++)
+                {
+                    if (k > i) sb.Append(' ');
+                    sb.Append(widths[cids[k]]);
+                }
+                sb.Append("] ");
+                i = j;
+            }
+            sb.Append(']');
             return sb.ToString();
         }
 
