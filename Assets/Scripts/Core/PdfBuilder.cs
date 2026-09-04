@@ -47,13 +47,16 @@ namespace PinyinApp.Core
             Layout layout = new Layout(opts, result, glyph);
             List<PageInfo> pages = layout.Run();
 
-            // 页脚（第 X 页）
+            // 页脚（第 X 页）——使用子集字形（Identity-H），否则中文会乱码
             for (int i = 0; i < pages.Count; i++)
             {
+                string footer = "中文拼音助手 · 第 " + (i + 1) + " / " + pages.Count + " 页";
+                const float fs = 9f;
+                float fw = glyph.Width(footer, fs);
                 StringBuilder fb = new StringBuilder();
-                fb.Append("BT /F1 9 Tf 0.55 0.55 0.55 rg 1 0 0 1 ")
-                  .Append(PageW / 2f - 30f).Append(" ").Append(30).Append(" Tm (");
-                fb.Append("中文拼音助手 · 第 ").Append(i + 1).Append(" / ").Append(pages.Count).Append(" 页) Tj ET\n");
+                fb.Append("BT /F1 ").Append(Fmt(fs)).Append(" Tf 0.55 0.55 0.55 rg 1 0 0 1 ")
+                  .Append(Fmt(PageW / 2f - fw / 2f)).Append(' ').Append(Fmt(30f)).Append(" Tm <")
+                  .Append(glyph.Hex(footer)).Append("> Tj ET\n");
                 pages[i].ContentBytes = Encoding.ASCII.GetBytes(fb.ToString());
             }
 
@@ -65,7 +68,8 @@ namespace PinyinApp.Core
         private static void CollectUsedChars(PinyinResult result, HashSet<uint> used)
         {
             Add(used, "中文拼音对照表");
-            Add(used, "原文共 行 汉字 个 · 转换时间 ：-:.0123456789（）()");
+            Add(used, "中文拼音助手 · 第 页 / 共 字");
+            Add(used, "汉字 个 · 转换时间 ：-:.0123456789（）()");
             Add(used, "拼音风格：带声调符号数字（ā á ǎ à a1 a2 a3 a4）");
             Add(used, "注：拼音依据常见词库进行多音字消歧，未命中词语的汉字取常见读音。");
 
@@ -161,8 +165,8 @@ namespace PinyinApp.Core
                 // 标题
                 Title(_opts.Title);
 
-                // 元信息
-                string meta = "原文共 " + _result.Lines.Count + " 行 · 汉字 " + _result.CjkCharCount + " 个 · 共 " + _result.TotalCharCount + " 字";
+                // 元信息（与 Word 导出保持一致）
+                string meta = "汉字 " + _result.CjkCharCount + " 个 · 共 " + _result.TotalCharCount + " 字";
                 if (!string.IsNullOrEmpty(_opts.Timestamp)) meta += " · 转换时间 " + _opts.Timestamp;
                 Meta(meta);
                 string toneDesc = _opts.ToneStyle == ToneStyle.Symbol ? "带声调符号（ā á ǎ à）" :
@@ -241,14 +245,16 @@ namespace PinyinApp.Core
 
             private void Title(string s)
             {
-                Text(s, 20f, 0.16f, 0.30f, 0.56f, PageW / 2f, true);
-                _y -= 26f;
+                // 与 Word 一致：22pt、加粗色 #2F5496、居中
+                Text(s, 22f, 0.184f, 0.329f, 0.588f, PageW / 2f, true);
+                _y -= 30f;
             }
 
             private void Meta(string s)
             {
-                Text(s, 10f, 0.40f, 0.40f, 0.40f, PageW / 2f, true);
-                _y -= 15f;
+                // 与 Word 一致：10pt、#595959、居中
+                Text(s, 10f, 0.349f, 0.349f, 0.349f, PageW / 2f, true);
+                _y -= 16f;
             }
 
             private void Heading(string s)
@@ -277,14 +283,15 @@ namespace PinyinApp.Core
             {
                 Ensure(30f);
                 _y -= 8f;
-                Text("注：拼音依据常见词库进行多音字消歧，未命中词语的汉字取常见读音。", 9f, 0.55f, 0.55f, 0.55f, Margin);
+                // 与 Word 一致：9pt、#808080
+                Text("注：拼音依据常见词库进行多音字消歧，未命中词语的汉字取常见读音。", 9f, 0.502f, 0.502f, 0.502f, Margin);
                 _y -= 14f;
             }
 
             // ---------- 注音排版（一行拼音 + 一行汉字，逐字对齐） ----------
 
-            private const float CharSize = 15f;     // 汉字字号
-            private const float PySize = 8.5f;      // 拼音字号
+            private const float CharSize = 15f;     // 汉字字号（与 Word BaseSz=30 半点 = 15pt 一致）
+            private const float PySize = 7.5f;      // 拼音字号（与 Word RubySz=15 半点 = 7.5pt 一致）
             private const float PyGap = 3f;         // 拼音与汉字的垂直间距
             private const float UnitGap = 1.5f;     // 字与字之间的水平间距
             private const float RowPad = 9f;        // 行间距
@@ -337,10 +344,12 @@ namespace PinyinApp.Core
                     if (u.Top.Length > 0)
                     {
                         float w = _g.Width(u.Top, PySize);
-                        TextAt(u.Top, PySize, 0.16f, 0.37f, 0.83f, x + (colW - w) / 2f, pyBaseline);
+                        // 拼音颜色与 Word 一致：#3B6EF6
+                        TextAt(u.Top, PySize, 0.231f, 0.431f, 0.965f, x + (colW - w) / 2f, pyBaseline);
                     }
                     float bw = _g.Width(u.Base, CharSize);
-                    TextAt(u.Base, CharSize, 0.12f, 0.16f, 0.28f, x + (colW - bw) / 2f, chBaseline);
+                    // 汉字/原文：黑色
+                    TextAt(u.Base, CharSize, 0f, 0f, 0f, x + (colW - bw) / 2f, chBaseline);
                     x += u.W;
                 }
                 _y -= rowH;
@@ -547,15 +556,38 @@ namespace PinyinApp.Core
 
         private static string BuildWArray(FontSubset subset, TtfFont font)
         {
-            StringBuilder sb = new StringBuilder("[ ");
+            // PDF 的 /W 数组必须使用十进制 CID（c [w1 w2 …] 形式），
+            // 用 <hex> 是非法的，会导致全部字形回退到 /DW 1000，
+            // 表现为拉丁字母/数字间距过大、拼音重叠。
+            List<ushort> cids = new List<ushort>();
+            Dictionary<ushort, int> widths = new Dictionary<ushort, int>();
             foreach (KeyValuePair<uint, ushort> kv in subset.UnicodeToNewGid)
             {
+                if (widths.ContainsKey(kv.Value)) continue;
                 ushort oldGid = font.GetGlyph(kv.Key);
                 float adv = font.GetAdvance(oldGid);
-                int w = (int)Math.Round(adv / font.UnitsPerEm * 1000f);
-                sb.Append('<').Append(kv.Value.ToString("X4")).Append("> [").Append(w).Append("] ");
+                widths[kv.Value] = (int)Math.Round(adv / font.UnitsPerEm * 1000f);
+                cids.Add(kv.Value);
             }
-            sb.Append("]");
+            cids.Sort();
+
+            StringBuilder sb = new StringBuilder("[ ");
+            int i = 0;
+            while (i < cids.Count)
+            {
+                // 连续 CID 合并为 c [w1 w2 …]，减小体积
+                int j = i + 1;
+                while (j < cids.Count && cids[j] == cids[j - 1] + 1) j++;
+                sb.Append((int)cids[i]).Append(" [");
+                for (int k = i; k < j; k++)
+                {
+                    if (k > i) sb.Append(' ');
+                    sb.Append(widths[cids[k]]);
+                }
+                sb.Append("] ");
+                i = j;
+            }
+            sb.Append(']');
             return sb.ToString();
         }
 

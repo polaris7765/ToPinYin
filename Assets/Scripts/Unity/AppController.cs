@@ -68,7 +68,17 @@ namespace PinyinApp.Unity
             WireEvents();
             ApplyRuntimeFonts();
             _lastScreen = new Vector2Int(Screen.width, Screen.height);
+            StartCoroutine(LoadPdfFont());
             StartCoroutine(LoadData());
+        }
+
+        /// <summary>预加载 PDF 中文字体；不可用时隐藏「导出 PDF」按钮并重排底部按钮。</summary>
+        private IEnumerator LoadPdfFont()
+        {
+            yield return PdfFontProvider.Load(ok =>
+            {
+                if (!ok) Rebuild();             // 隐藏 PDF 按钮后重排布局
+            });
         }
 
         private Vector2Int _lastScreen;
@@ -137,6 +147,7 @@ namespace PinyinApp.Unity
             // 自测模式：-demo 启动时自动填词、转换并导出 Word/PDF
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-demo") >= 0)
             {
+                while (PdfFontProvider.Status == PdfFontProvider.State.Loading) yield return null;
                 RunDemo();
             }
         }
@@ -264,9 +275,10 @@ namespace PinyinApp.Unity
             float inputTop = 64f;
             float inputH = Mathf.Max(120f, size.y - inputTop - (toneBottom + rowH + 14f));
 
-            // 输入框
-            _input = UiFactory.CreateInputField(card, S(22), 22, "请输入中文，例如：你好，世界！\n支持多行输入、多音字智能消歧。", true);
-            UiFactory.Place(_input.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -inputTop), new Vector2(innerW, inputH));
+            // 输入框（多行可滚动，根节点即滚动视口）
+            RectTransform inputRoot;
+            _input = UiFactory.CreateInputField(card, S(22), 22, "请输入中文，例如：你好，世界！\n支持多行输入、多音字智能消歧。", true, out inputRoot);
+            UiFactory.Place(inputRoot, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -inputTop), new Vector2(innerW, inputH));
 
             const float labelW = 76f;
             float segAreaX = 24f + labelW;
@@ -329,9 +341,10 @@ namespace PinyinApp.Unity
             _output = outGo.AddComponent<AnnotatedOutput>();
             _output.Setup(sr, content);
 
-            // 底部操作按钮：移动端不显示「打开目录」
+            // 底部操作按钮：移动端不显示「打开目录」；PDF 不可用时不显示「导出 PDF」
             bool mobile = NativeFileOpener.IsMobile;
-            int count = mobile ? 4 : 5;
+            bool pdf = PdfFontProvider.MaybeSupported;
+            int count = (mobile ? 3 : 4) + (pdf ? 1 : 0);
             float bgap = 10f;
             float bw = (innerW - bgap * (count - 1)) / count;
             float bx = 24f;
@@ -342,8 +355,12 @@ namespace PinyinApp.Unity
             _btnWord = UiFactory.CreateButton(card, "导出 Word", 19, UiFactory.PrimaryLight, UiFactory.Primary, S(19), _btnSprite, OnExportDocx);
             PlaceBottom(_btnWord.GetComponent<RectTransform>(), bx, btnBottom, bw, btnH); bx += bw + bgap;
 
-            _btnPdf = UiFactory.CreateButton(card, "导出 PDF", 19, UiFactory.PrimaryLight, UiFactory.Primary, S(19), _btnSprite, OnExportPdf);
-            PlaceBottom(_btnPdf.GetComponent<RectTransform>(), bx, btnBottom, bw, btnH); bx += bw + bgap;
+            _btnPdf = null;
+            if (pdf)
+            {
+                _btnPdf = UiFactory.CreateButton(card, "导出 PDF", 19, UiFactory.PrimaryLight, UiFactory.Primary, S(19), _btnSprite, OnExportPdf);
+                PlaceBottom(_btnPdf.GetComponent<RectTransform>(), bx, btnBottom, bw, btnH); bx += bw + bgap;
+            }
 
             _btnTxt = UiFactory.CreateButton(card, "导出文本", 19, UiFactory.PrimaryLight, UiFactory.Primary, S(19), _btnSprite, OnExportTxt);
             PlaceBottom(_btnTxt.GetComponent<RectTransform>(), bx, btnBottom, bw, btnH); bx += bw + bgap;
@@ -551,13 +568,38 @@ namespace PinyinApp.Unity
         private void OnExportPdf()
         {
             if (!EnsureResult()) return;
+            if (!PdfFontProvider.MaybeSupported)
+            {
+                Status("当前平台无法导出 PDF：" + (PdfFontProvider.LastError ?? "字体不可用"));
+                return;
+            }
+            if (!PdfFontProvider.IsReady)
+            {
+                // Android 上字体位于 APK 内，需异步读取；加载完成后自动继续导出
+                Status("正在准备字体，请稍候…");
+                StartCoroutine(LoadFontThenExportPdf());
+                return;
+            }
+            ExportPdfNow();
+        }
+
+        private IEnumerator LoadFontThenExportPdf()
+        {
+            yield return PdfFontProvider.Load(null);
+            if (PdfFontProvider.IsReady) ExportPdfNow();
+            else
+            {
+                Status("导出 PDF 失败：" + (PdfFontProvider.LastError ?? "字体不可用"));
+                Rebuild();                      // 隐藏不可用的 PDF 按钮
+            }
+        }
+
+        private void ExportPdfNow()
+        {
             try
             {
-                string fontPath = Path.Combine(Application.streamingAssetsPath, "NotoSansSC.ttf");
-                if (!File.Exists(fontPath)) { Status("未找到内置字体：" + fontPath); return; }
-                byte[] fontBytes = File.ReadAllBytes(fontPath);
                 PdfOptions o = new PdfOptions { ToneStyle = _tone, UAsV = _uAsV, Timestamp = NowStr() };
-                byte[] bytes = PdfBuilder.Build(_result, o, fontBytes);
+                byte[] bytes = PdfBuilder.Build(_result, o, PdfFontProvider.FontBytes);
                 string path = SaveFile("拼音对照_" + Stamp() + ".pdf", bytes);
                 AfterExport("PDF", path);
             }

@@ -189,70 +189,183 @@ namespace PinyinApp.Unity
             }
         }
 
-        public static InputField CreateInputField(Transform parent, Font font, int fontSize, string placeholder, bool multiline)
+        /// <summary>
+        /// 创建输入框。多行模式下整体是一个 ScrollRect：
+        /// 根节点 = 视口（背景 + RectMask2D + ScrollRect + 右侧滚动条），
+        /// InputField 本身作为 Content（ContentSizeFitter 竖向 PreferredSize 自动撑高），
+        /// 因此文字过多时可用手指拖动 / 滚轮滚动，输入时自动跟随光标。
+        /// <paramref name="rootOut"/> 为需要参与外部布局定位的根节点。
+        /// </summary>
+        public static InputField CreateInputField(Transform parent, Font font, int fontSize, string placeholder, bool multiline, out RectTransform rootOut)
         {
-            RectTransform rt = CreateUI("InputField", parent);
-            Image img = rt.gameObject.AddComponent<Image>();
-            img.color = InputBg;
-            img.raycastTarget = true;
+            if (!multiline)
+            {
+                RectTransform srt = CreateUI("InputField", parent);
+                Image simg = srt.gameObject.AddComponent<Image>();
+                simg.color = InputBg;
+                simg.raycastTarget = true;
+                InputField sField = srt.gameObject.AddComponent<InputField>();
+                sField.targetGraphic = simg;
+
+                Text sText = CreateFieldText(srt, "Text", font, fontSize, TextDark, false, null);
+                Stretch(sText.rectTransform, 12, 6, 12, 6);
+                Text sPh = CreateFieldText(srt, "Placeholder", font, fontSize, TextLight, false, placeholder);
+                Stretch(sPh.rectTransform, 12, 6, 12, 6);
+                ConfigureField(sField, sText, sPh, false);
+                rootOut = srt;
+                return sField;
+            }
+
+            // 根 = 滚动视口
+            var scrollbarWidth = ScrollbarWidth + 4f;   // 右侧滚动条 + 内边距
+            RectTransform root = CreateUI("InputScroll", parent);
+            Image bg = root.gameObject.AddComponent<Image>();
+            bg.color = InputBg;
+            bg.raycastTarget = true;
+            root.gameObject.AddComponent<RectMask2D>();
+
+            // Content = InputField 本体（高度自适应）
+            RectTransform rt = CreateUI("InputField", root);
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.offsetMin = new Vector2(0f, 0f);
+            rt.offsetMax = new Vector2(-scrollbarWidth, 0f);
+            rt.sizeDelta = new Vector2(-scrollbarWidth, 120f);
+            rt.anchoredPosition = new Vector2(-scrollbarWidth * 0.5f, 0f);
+
+            Image hit = rt.gameObject.AddComponent<Image>();
+            hit.color = new Color(0f, 0f, 0f, 0f);      // 透明，仅用于接收点击/拖拽
+            hit.raycastTarget = true;
 
             InputField field = rt.gameObject.AddComponent<InputField>();
-            field.targetGraphic = img;
+            field.targetGraphic = hit;
 
-            // 文本
-            RectTransform tr = CreateUI("Text", rt);
-            Stretch(tr, 12, 6, 12, 6);
-            Text text = tr.gameObject.AddComponent<Text>();
-            text.font = font;
-            text.fontSize = fontSize;
-            text.color = TextDark;
-            text.alignment = multiline ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft;
-            text.supportRichText = false;
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Truncate;
-            text.raycastTarget = false;
+            Text text = CreateFieldText(rt, "Text", font, fontSize, TextDark, true, null);
+            Stretch(text.rectTransform, 12, 6, 12, 6);
+            Text ph = CreateFieldText(rt, "Placeholder", font, fontSize, TextLight, true, placeholder);
+            Stretch(ph.rectTransform, 12, 6, 12, 6);
+            ConfigureField(field, text, ph, true);
 
-            // 占位符
-            RectTransform pr = CreateUI("Placeholder", rt);
-            Stretch(pr, 12, 6, 12, 6);
-            Text ph = pr.gameObject.AddComponent<Text>();
-            ph.font = font;
-            ph.fontSize = fontSize;
-            ph.color = TextLight;
-            ph.alignment = multiline ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft;
-            ph.supportRichText = false;
-            ph.horizontalOverflow = HorizontalWrapMode.Wrap;
-            ph.verticalOverflow = VerticalWrapMode.Truncate;
-            ph.text = placeholder;
-            ph.raycastTarget = false;
+            ContentSizeFitter fitter = rt.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
+            Scrollbar sb = CreateVerticalScrollbar(root, 4f);
+            sb.gameObject.SetActive(false);             // 默认隐藏，内容超出时由 InputFieldScroller 显示
+
+            ScrollRect sr = root.gameObject.AddComponent<ScrollRect>();
+            sr.viewport = root;
+            sr.content = rt;
+            sr.horizontal = false;
+            sr.vertical = true;
+            sr.verticalScrollbar = sb;
+            // 显隐由 InputFieldScroller 按内容高度控制（AutoHide 会改动布局尺寸，这里不用）
+            sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+            sr.movementType = ScrollRect.MovementType.Clamped;
+            sr.scrollSensitivity = 26f;
+            sr.inertia = true;
+            sr.decelerationRate = 0.135f;
+
+            InputFieldScroller scroller = rt.gameObject.AddComponent<InputFieldScroller>();
+            scroller.Setup(field, sr, text);
+
+            rootOut = root;
+            return field;
+        }
+
+        private static void ConfigureField(InputField field, Text text, Text placeholder, bool multiline)
+        {
             field.textComponent = text;
-            field.placeholder = ph;
+            field.placeholder = placeholder;
             field.lineType = multiline ? InputField.LineType.MultiLineNewline : InputField.LineType.SingleLine;
             field.characterLimit = 0;
             field.caretBlinkRate = 0.85f;
             field.selectionColor = new Color(0.23f, 0.43f, 0.96f, 0.4f);
-            return field;
         }
 
-        /// <summary>创建 ScrollRect 结构（Viewport + Content），返回 ScrollRect。</summary>
+        private static Text CreateFieldText(Transform parent, string name, Font font, int fontSize, Color color, bool multiline, string content)
+        {
+            RectTransform rt = CreateUI(name, parent);
+            Text t = rt.gameObject.AddComponent<Text>();
+            t.font = font;
+            t.fontSize = fontSize;
+            t.color = color;
+            t.alignment = multiline ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft;
+            t.supportRichText = false;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            // 多行时不截断，由 Content 高度 + RectMask2D 负责裁剪与滚动
+            t.verticalOverflow = multiline ? VerticalWrapMode.Overflow : VerticalWrapMode.Truncate;
+            t.raycastTarget = false;
+            if (content != null) t.text = content;
+            return t;
+        }
+
+        /// <summary>创建贴右侧的垂直滚动条。</summary>
+        private static Scrollbar CreateVerticalScrollbar(RectTransform parent, float inset = 0f)
+        {
+            RectTransform sbRt = CreateUI("Scrollbar", parent);
+            sbRt.anchorMin = new Vector2(1f, 0f);
+            sbRt.anchorMax = new Vector2(1f, 1f);
+            sbRt.pivot = new Vector2(1f, 1f);
+            sbRt.offsetMin = new Vector2(-ScrollbarWidth, inset);
+            sbRt.offsetMax = new Vector2(0f, -inset);
+            Image sbBg = sbRt.gameObject.AddComponent<Image>();
+            //sbBg.color = new Color(0f, 0f, 0f, 0.05f);
+            sbBg.enabled = false;
+
+            RectTransform slidingArea = CreateUI("SlidingArea", sbRt);
+            Stretch(slidingArea, 1, 1, 1, 1);
+
+            RectTransform handleRt = CreateUI("Handle", slidingArea);
+            Stretch(handleRt, 0, 0, 0, 0);
+            Image handleImg = handleRt.gameObject.AddComponent<Image>();
+            handleImg.color = new Color(0.55f, 0.60f, 0.70f, 0.75f);
+
+            Scrollbar sb = sbRt.gameObject.AddComponent<Scrollbar>();
+            sb.direction = Scrollbar.Direction.BottomToTop;
+            sb.handleRect = handleRt;
+            sb.targetGraphic = handleImg;
+            sb.transition = Selectable.Transition.None;
+            return sb;
+        }
+
+        /// <summary>滚动条宽度（参考单位）。</summary>
+        public const float ScrollbarWidth = 16f;
+
+        /// <summary>创建 ScrollRect 结构（Root + Viewport(RectMask2D) + Content + 垂直滚动条），返回 ScrollRect。</summary>
         public static ScrollRect CreateScrollRect(Transform parent, out RectTransform contentOut)
         {
-            // Viewport
-            RectTransform vp = CreateUI("Viewport", parent);
-            Image vpImg = vp.gameObject.AddComponent<Image>();
-            vpImg.color = new Color(0.97f, 0.98f, 1f, 1f);
+            // 根节点（承载 ScrollRect 与背景）
+            RectTransform root = CreateUI("Scroll", parent);
+            Image rootImg = root.gameObject.AddComponent<Image>();
+            rootImg.color = new Color(0.97f, 0.98f, 1f, 1f);
+
+            // Viewport：裁剪区域，右侧留出滚动条宽度
+            RectTransform vp = CreateUI("Viewport", root);
+            vp.anchorMin = Vector2.zero;
+            vp.anchorMax = Vector2.one;
+            vp.pivot = new Vector2(0f, 1f);
+            vp.offsetMin = new Vector2(0f, 0f);
+            vp.offsetMax = new Vector2(-ScrollbarWidth, 0f);
+            vp.gameObject.AddComponent<RectMask2D>();
 
             RectTransform content = CreateUI("Content", vp);
             content.anchorMin = new Vector2(0f, 1f);
             content.anchorMax = new Vector2(0f, 1f);
             content.pivot = new Vector2(0f, 1f);
 
-            ScrollRect sr = vp.gameObject.AddComponent<ScrollRect>();
+            // 垂直滚动条
+            Scrollbar sb = CreateVerticalScrollbar(root);
+
+            ScrollRect sr = root.gameObject.AddComponent<ScrollRect>();
             sr.viewport = vp;
             sr.content = content;
             sr.horizontal = false;
             sr.vertical = true;
+            sr.verticalScrollbar = sb;
+            sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            sr.verticalScrollbarSpacing = 0f;
             sr.movementType = ScrollRect.MovementType.Clamped;
             sr.scrollSensitivity = 30f;
             sr.inertia = true;
