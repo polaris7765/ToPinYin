@@ -176,18 +176,7 @@ namespace PinyinApp.Unity
             return btn;
         }
 
-        /// <summary>段选辅助：记录每个段的 Text 与 Image 供高亮刷新，Btn 供重新绑定点击。</summary>
-        public class SegmentRef : MonoBehaviour
-        {
-            public Text Label;
-            public Image Bg;
-            public Button Btn;
-            public void SetActive(bool active)
-            {
-                if (Bg != null) Bg.color = active ? Primary : Color.white;
-                if (Label != null) Label.color = active ? Color.white : TextGray;
-            }
-        }
+        /// <summary>段选辅助组件见 <see cref="SegmentRef"/>（独立文件，便于场景序列化）。</summary>
 
         /// <summary>
         /// 创建输入框。多行模式下整体是一个 ScrollRect：
@@ -389,8 +378,17 @@ namespace PinyinApp.Unity
             return MakeRounded(w, h, radius, fill, Color.clear, 0);
         }
 
+        /// <summary>
+        /// 生成精灵后的处理钩子（编辑器烘焙场景时使用）：
+        /// 运行时创建的 Sprite/Texture 无法随场景序列化，编辑器可在此把它们保存为磁盘资源并返回资源引用。
+        /// 参数为 (临时精灵, 唯一键)，返回实际要使用的精灵。
+        /// </summary>
+        public static Func<Sprite, string, Sprite> SpritePostProcess;
+
         private static Sprite MakeRounded(int w, int h, int radius, Color fill, Color border, int borderW)
         {
+            string key = string.Format("ui_{0}x{1}_r{2}_f{3}_b{4}_{5}", w, h, radius,
+                ColorUtility.ToHtmlStringRGBA(fill), ColorUtility.ToHtmlStringRGBA(border), borderW);
             Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
             tex.filterMode = FilterMode.Bilinear;
             float cx = w / 2f, cy = h / 2f, hw = w / 2f, hh = h / 2f;
@@ -415,7 +413,13 @@ namespace PinyinApp.Unity
             }
             tex.Apply();
             Vector4 b = new Vector4(r, r, r, r);
-            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, b);
+            Sprite sprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, b);
+            if (SpritePostProcess != null)
+            {
+                Sprite persisted = SpritePostProcess(sprite, key);
+                if (persisted != null) return persisted;
+            }
+            return sprite;
         }
 
         private static float RoundedSdf(float px, float py, float cx, float cy, float hw, float hh, float r)

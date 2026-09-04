@@ -16,8 +16,8 @@ namespace PinyinApp.Unity
     {
         public enum DisplayMode { Annotated, Inline, PinyinOnly }
 
-        private ScrollRect _scroll;
-        private RectTransform _content;
+        [SerializeField] private ScrollRect _scroll;
+        [SerializeField] private RectTransform _content;
         private Font _font;
 
         private const float CharSize = 30f;

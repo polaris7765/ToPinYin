@@ -18,23 +18,24 @@ namespace PinyinApp.Unity
         private PinyinEngine _engine;
         private PinyinResult _result;
 
-        // UI 引用
-        private InputField _input;
-        private Text _charCount;
-        private AnnotatedOutput _output;
-        private Text _status;
-        private UiFactory.SegmentRef[] _toneSegs;
-        private UiFactory.SegmentRef[] _modeSegs;
-        private Image _uAsvBg;
-        private Text _uAsvLabel;
-        private Button _btnConvert;
-        private Button _btnClear;
-        private Button _btnWord;
-        private Button _btnPdf;
-        private Button _btnTxt;
-        private Button _btnCopy;
-        private Button _btnOpenDir;
-        private Button _uvButton;
+        // UI 引用（编辑器烘焙场景时写入并随场景序列化，运行时直接复用）
+        [SerializeField] private bool _uiBaked;
+        [SerializeField] private InputField _input;
+        [SerializeField] private Text _charCount;
+        [SerializeField] private AnnotatedOutput _output;
+        [SerializeField] private Text _status;
+        [SerializeField] private SegmentRef[] _toneSegs;
+        [SerializeField] private SegmentRef[] _modeSegs;
+        [SerializeField] private Image _uAsvBg;
+        [SerializeField] private Text _uAsvLabel;
+        [SerializeField] private Button _btnConvert;
+        [SerializeField] private Button _btnClear;
+        [SerializeField] private Button _btnWord;
+        [SerializeField] private Button _btnPdf;
+        [SerializeField] private Button _btnTxt;
+        [SerializeField] private Button _btnCopy;
+        [SerializeField] private Button _btnOpenDir;
+        [SerializeField] private Button _uvButton;
 
         // 自适应布局尺寸（参考单位，宽固定 1080，高按屏幕比例推算，并扣除安全区）
         private float _w = 1080f;
@@ -62,9 +63,22 @@ namespace PinyinApp.Unity
             }
         }
 
+        /// <summary>场景中的 UI 是否已由编辑器烘焙好（烘焙后运行时不再重建 UI）。</summary>
+        private bool UiIsBaked { get { return _uiBaked && _input != null && _output != null; } }
+
+#if UNITY_EDITOR
+        /// <summary>编辑器菜单「重建主场景」调用：在编辑模式下把全部 UI 生成到场景里并记录引用。</summary>
+        public void BuildUiInEditor()
+        {
+            _uiBaked = false;
+            BuildUi();
+            _uiBaked = true;
+        }
+#endif
+
         private void Start()
         {
-            BuildUi();                          // 始终按当前屏幕尺寸重建，保证自适应
+            if (!UiIsBaked) BuildUi();          // 未烘焙时才在运行时构建
             WireEvents();
             ApplyRuntimeFonts();
             _lastScreen = new Vector2Int(Screen.width, Screen.height);
@@ -77,7 +91,7 @@ namespace PinyinApp.Unity
         {
             yield return PdfFontProvider.Load(ok =>
             {
-                if (!ok) Rebuild();             // 隐藏 PDF 按钮后重排布局
+                if (!ok) Rebuild();             // 隐藏 PDF 按钮（未烘焙时重排布局）
             });
         }
 
@@ -86,6 +100,7 @@ namespace PinyinApp.Unity
 
         private void Update()
         {
+            if (UiIsBaked) return;              // 烘焙好的 UI 不再随屏幕变化重建
             // 屏幕尺寸 / 方向变化时重建布局（防抖 0.25s）
             if (_lastScreen.x != Screen.width || _lastScreen.y != Screen.height)
             {
@@ -100,9 +115,17 @@ namespace PinyinApp.Unity
             else _rebuildTimer = 0f;
         }
 
-        /// <summary>重建 UI 并恢复当前状态。</summary>
+        /// <summary>重建 UI 并恢复当前状态；UI 已烘焙时只做状态刷新，不重新生成。</summary>
         private void Rebuild()
         {
+            if (UiIsBaked)
+            {
+                // 仅隐藏当前不可用的按钮，保持场景中已烘焙的布局
+                if (_btnPdf != null && !PdfFontProvider.MaybeSupported) _btnPdf.gameObject.SetActive(false);
+                if (_btnOpenDir != null && NativeFileOpener.IsMobile) _btnOpenDir.gameObject.SetActive(false);
+                return;
+            }
+
             string text = _input != null ? _input.text : "";
             BuildUi();
             WireEvents();
@@ -405,9 +428,9 @@ namespace PinyinApp.Unity
             return card;
         }
 
-        private UiFactory.SegmentRef[] CreateSegmentRow(Transform parent, float x, float bottom, string[] labels, float btnW, float btnH, int fontSize, Action<int> onChanged)
+        private SegmentRef[] CreateSegmentRow(Transform parent, float x, float bottom, string[] labels, float btnW, float btnH, int fontSize, Action<int> onChanged)
         {
-            var refs = new UiFactory.SegmentRef[labels.Length];
+            var refs = new SegmentRef[labels.Length];
             for (int i = 0; i < labels.Length; i++)
             {
                 int idx = i;
@@ -416,12 +439,12 @@ namespace PinyinApp.Unity
                     _segSprite ?? (_segSprite = UiFactory.RoundedRectFill(48, 48, 10, Color.white)),
                     () => onChanged(idx), null);
                 PlaceBottom(b.GetComponent<RectTransform>(), bx, bottom, btnW, btnH);
-                refs[i] = b.GetComponent<UiFactory.SegmentRef>();
+                refs[i] = b.GetComponent<SegmentRef>();
             }
             return refs;
         }
 
-        private static void RefreshSegments(UiFactory.SegmentRef[] refs, int active)
+        private static void RefreshSegments(SegmentRef[] refs, int active)
         {
             if (refs == null) return;
             for (int i = 0; i < refs.Length; i++)
@@ -447,7 +470,7 @@ namespace PinyinApp.Unity
             WireSegments(_modeSegs, OnModeChanged);
         }
 
-        private static void WireSegments(UiFactory.SegmentRef[] segs, Action<int> cb)
+        private static void WireSegments(SegmentRef[] segs, Action<int> cb)
         {
             if (segs == null) return;
             for (int i = 0; i < segs.Length; i++)

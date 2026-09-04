@@ -11,11 +11,11 @@ namespace PinyinApp.Unity
     /// </summary>
     public class InputFieldScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IScrollHandler
     {
-        private InputField _field;
-        private ScrollRect _scroll;
+        [SerializeField] private InputField _field;
+        [SerializeField] private ScrollRect _scroll;
         private RectTransform _viewport;
         private RectTransform _content;
-        private Text _text;
+        [SerializeField] private Text _text;
         private LayoutElement _layout;
 
         private int _lastCaret = -1;
@@ -36,6 +36,18 @@ namespace PinyinApp.Unity
             _layout = GetComponent<LayoutElement>();
             if (_layout == null) _layout = gameObject.AddComponent<LayoutElement>();
             _layout.preferredHeight = -1f;      // 首帧由 LateUpdate 依据文本高度设置
+        }
+
+        /// <summary>场景中已烘焙好引用时（编辑器构建 UI），运行时补齐非序列化字段。</summary>
+        private void Awake()
+        {
+            _content = (RectTransform)transform;
+            if (_viewport == null && _scroll != null) _viewport = _scroll.viewport;
+            if (_layout == null)
+            {
+                _layout = GetComponent<LayoutElement>();
+                if (_layout == null) _layout = gameObject.AddComponent<LayoutElement>();
+            }
         }
 
         private void LateUpdate()
