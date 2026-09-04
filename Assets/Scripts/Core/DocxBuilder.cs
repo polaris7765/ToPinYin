@@ -73,7 +73,7 @@ namespace PinyinApp.Core
             sb.Append(Para(opts.Title, bold: true, 44, "2F5496", "center", before: 80, after: 120));
 
             // 元信息
-            string meta = "原文共 " + result.Lines.Count + " 行 · 汉字 " + result.CjkCharCount + " 个 · 共 " + result.TotalCharCount + " 字";
+            string meta = "汉字 " + result.CjkCharCount + " 个 · 共 " + result.TotalCharCount + " 字";
             if (!string.IsNullOrEmpty(opts.Timestamp)) meta += " · 转换时间 " + opts.Timestamp;
             sb.Append(Para(meta, bold: false, 20, "595959", "center", before: 0, after: 60));
 
