@@ -136,8 +136,7 @@ Page({
 
   _initTheme: function () {
     var style = theme.refresh();
-    /* 自定义导航：把状态栏高度作为顶部内边距，避免蓝色头部与系统状态栏重叠 */
-    if (this._statusBarHeight) style += 'padding-top:' + this._statusBarHeight + 'px;';
+    /* 顶部蓝色背景由 .header 自己覆盖，容器不再加 padding-top */
     this.setData({
       themeStyle: style,
       statusBarHeight: this._statusBarHeight || 0,

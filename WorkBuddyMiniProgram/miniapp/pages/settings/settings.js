@@ -49,6 +49,9 @@ Page({
         confirmText: t('common.confirm'),
         exportNoteTitle: t('settings.exportNoteTitle'),
         exportNoteDocx: t('settings.exportNoteDocx'),
+        aboutSectionTitle: t('settings.section.about'),
+        aboutLabel: t('settings.about.appName'),
+        aboutVersion: t('settings.about.version'),
       },
     });
     this._renderRows();
@@ -150,6 +153,10 @@ Page({
     if (!key || !opt || !opt[idx]) return;
     settings.set(key, opt[idx].key);
     this._renderRows();
+  },
+
+  goAbout: function () {
+    wx.navigateTo({ url: '/pages/about/about' });
   },
 
   reset: function () {

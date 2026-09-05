@@ -129,4 +129,13 @@
       <text class="settings-note">{{i18n.exportNoteDocx}}</text>
     </view>
   </view>
+
+  <!-- 关于 -->
+  <view class="settings-section">
+    <view class="settings-section-title">{{i18n.aboutSectionTitle}}</view>
+    <view class="settings-row first tap" hover-class="none" bindtap="goAbout">
+      <view class="settings-label">{{i18n.aboutLabel}}</view>
+      <view class="settings-value">{{i18n.aboutVersion}} <text class="settings-chevron">›</text></view>
+    </view>
+  </view>
 </view>

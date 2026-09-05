@@ -11,12 +11,14 @@ page {
   padding-bottom: 0;
 }
 
-/* 顶部品牌栏更紧凑，操作按钮更大 */
+/* 顶部品牌栏：全宽蓝色背景，覆盖状态栏下方整个顶部区域 */
 .home .header {
   flex: 0 0 auto;
-  margin-top: 16rpx;
-  height: 108rpx;
-  padding: 0 20rpx;
+  margin: 0 -24rpx;
+  height: auto;
+  min-height: 96rpx;
+  padding: 0 20rpx 16rpx;
+  border-radius: 0;
 }
 .home .header-icon {
   width: 60rpx;

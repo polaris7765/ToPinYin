@@ -40,3 +40,9 @@ page {
 .settings-btn {
   white-space: nowrap;
 }
+
+/* 关于入口箭头 */
+.settings-chevron {
+  margin-left: 8rpx;
+  color: var(--text-muted);
+}

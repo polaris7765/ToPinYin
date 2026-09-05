@@ -1,18 +1,15 @@
 <view class="container home" style="{{themeStyle}}">
 
-  <!-- 顶部品牌栏（含设置/关于按钮） -->
-  <view class="header" style="padding-right: {{headerRightPad}}px;">
+  <!-- 顶部品牌栏（仅设置按钮） -->
+  <view class="header" style="padding-top: {{statusBarHeight}}px; padding-right: {{headerRightPad}}px;">
     <view class="header-icon">拼</view>
     <view class="header-text">
       <view class="header-title">{{i18n.headerTitle}}</view>
       <view class="header-sub">{{i18n.headerSubtitle}}</view>
     </view>
     <view class="header-actions">
-      <view class="header-btn tap" hover-class="none" catchtap="goAbout">
-        <text class="header-btn-icon">ⓘ</text>
-      </view>
       <view class="header-btn tap" hover-class="none" catchtap="goSettings">
-        <text class="header-btn-icon icon-gear">⚙</text>
+        <text class="header-btn-icon">⚙</text>
       </view>
     </view>
   </view>
