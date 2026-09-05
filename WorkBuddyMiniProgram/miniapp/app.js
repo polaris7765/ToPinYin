@@ -12,6 +12,9 @@
  *  3. 加载方式：wx.loadSubpackage（按分包去重，每包仅一次）→ 同步 require → require.async 兜底（多端兼容）
  *  4. 所有分包就绪后，全局 engine = new pinyin.PinyinEngine() 并加载字典
  *  5. 已注册的 onReady 回调一次性获得 globalData（含 engine / wordCount / loadError）
+ *
+ *  注意：分包模块必须用「字面量路径」require，否则微信打包器（lazyCodeLoading 下）
+ *  无法静态解析动态拼接路径，会抛 "module not found"，导致拼音库永远加载失败。
  */
 'use strict';
 
@@ -28,8 +31,8 @@ var PACKAGE_MODULES = [
 
 var loadedModules = {};        // 完整路径 -> exports
 var readyCallbacks = [];        // 启动期注册、等待 _fireReady 通知的回调
-var loadedReady = false;       // 是否所有分包都加载成功
-var fontBytes = null;          // Uint8Array（用于 PDF 嵌入）
+var loadedReady = false;        // 是否所有分包都加载成功
+var fontBytes = null;           // Uint8Array（用于 PDF 嵌入）
 
 /* 分包级去重：同一分包（pkg.name）在会话内只调用一次 wx.loadSubpackage。
    原因：对同一 pkg.name 并发调用两次 wx.loadSubpackage，第二次往往既不
@@ -64,31 +67,41 @@ function _ensureSubpackage(pkgName) {
   return subpackagePromises[pkgName];
 }
 
+/* 用「字面量路径」加载分包模块。
+   必须为静态字符串，否则微信打包器（开启 lazyCodeLoading 时）无法把模块
+   正确打进分包并生成模块记录，运行时 require 会抛 "module not found"。 */
+function _requireLiteral(key) {
+  switch (key) {
+    case 'packageData/data/pinyin.js':   return require('./packageData/data/pinyin.js');
+    case 'packageData/data/zdic.js':     return require('./packageData/data/zdic.js');
+    case 'packagePhrase/data/phrase.js': return require('./packagePhrase/data/phrase.js');
+    case 'packageFontA/font-part1.js':   return require('./packageFontA/font-part1.js');
+    case 'packageFontA/font-part3.js':   return require('./packageFontA/font-part3.js');
+    case 'packageFontB/font-part2.js':   return require('./packageFontB/font-part2.js');
+    default: throw new Error('unknown module key: ' + key);
+  }
+}
+
 /* 单文件加载：先确保所属分包就绪（去重后只 loadSubpackage 一次），
    再 require 该文件。优先同步 require（分包就绪后最可靠）；
    失败才回退 require.async（老基础库/主包）。 */
 function _loadOne(pkg, rel) {
-  var pkgRoot = pkg.root;
-  var reqPath = './' + pkgRoot + '/' + rel;
-  var key = pkgRoot + '/' + rel;
+  var key = pkg.root + '/' + rel;
 
   return _ensureSubpackage(pkg.name).then(function () {
-    return new Promise(function (resolve, reject) {
-      var settled = false;
-      var settleOnce = function (fn) { if (!settled) { settled = true; fn(); } };
-
-      /* 分包已就绪，优先同步 require */
-      try {
-        loadedModules[key] = require(reqPath);
-        settleOnce(function () { resolve(loadedModules[key]); });
-        return;
-      } catch (e) {
-        /* 同步失败（如老基础库）：尝试 require.async 兜底 */
-        if (typeof require.async === 'function') {
+    try {
+      loadedModules[key] = _requireLiteral(key);
+      return loadedModules[key];
+    } catch (e1) {
+      /* 同步失败（如老基础库）：尝试 require.async 兜底 */
+      if (typeof require.async === 'function') {
+        return new Promise(function (resolve, reject) {
+          var settled = false;
+          var settleOnce = function (fn) { if (!settled) { settled = true; fn(); } };
           var to2 = setTimeout(function () {
-            settleOnce(function () { reject(new Error('require.async timeout: ' + reqPath)); });
+            settleOnce(function () { reject(new Error('require.async timeout: ' + key)); });
           }, 10000);
-          require.async(reqPath).then(function (mod) {
+          require.async('./' + key).then(function (mod) {
             clearTimeout(to2);
             loadedModules[key] = mod;
             settleOnce(function () { resolve(mod); });
@@ -96,11 +109,10 @@ function _loadOne(pkg, rel) {
             clearTimeout(to2);
             settleOnce(function () { reject(err); });
           });
-          return;
-        }
-        settleOnce(function () { reject(e); });
+        });
       }
-    });
+      throw e1;
+    }
   });
 }
 
@@ -123,6 +135,48 @@ function _fireReady(gd) {
   });
 }
 
+/* 真正执行「加载 4 个分包 + 初始化引擎」，onLaunch 与 reload 共用。 */
+function _startLoad(app) {
+  loadedReady = false;
+  app.globalData.ready = false;
+  app.globalData.loadError = null;
+
+  loadAll().then(function () {
+    try {
+      var pinyin = require('./utils/pinyin');
+      var base64 = require('./utils/base64');
+
+      var engine = new pinyin.PinyinEngine();
+      var ok = engine.loadCharObject(loadedModules['packageData/data/pinyin.js']);
+      var w1 = engine.loadWordObject(loadedModules['packagePhrase/data/phrase.js']);
+      var w2 = engine.loadWordObject(loadedModules['packageData/data/zdic.js']);
+
+      app.globalData.engine = engine;
+      app.globalData.wordCount = w1 + w2;
+      app.globalData.charOk = !!ok;
+
+      /* 预解码字体分片缓存，便于 PDF 立即使用 */
+      try {
+        var b64 = loadedModules['packageFontA/font-part1.js'] +
+                  loadedModules['packageFontB/font-part2.js'] +
+                  loadedModules['packageFontA/font-part3.js'];
+        fontBytes = base64.decode(b64);
+        app.globalData.fontBytes = fontBytes;
+      } catch (e) { fontBytes = null; app.globalData.fontBytes = null; }
+
+      loadedReady = true;
+      app.globalData.ready = true;
+    } catch (e) {
+      app.globalData.loadError = e;
+    }
+    /* 无论成败都通知所有页面，避免永远停在"加载中" */
+    _fireReady(app.globalData);
+  }, function (err) {
+    app.globalData.loadError = err;
+    _fireReady(app.globalData);
+  });
+}
+
 App({
   globalData: {
     ready: false,
@@ -130,6 +184,7 @@ App({
     loadedModules: loadedModules,
     fontBytes: null,
     wordCount: 0,
+    charOk: false,
     engine: null
   },
 
@@ -144,41 +199,7 @@ App({
     } catch (e) { /* ignore */ }
 
     var self = this;
-
-    /* 3. 异步加载 4 个分包并初始化拼音引擎 */
-    loadAll().then(function () {
-      try {
-        var pinyin = require('./utils/pinyin');
-        var base64 = require('./utils/base64');
-
-        var engine = new pinyin.PinyinEngine();
-        var ok = engine.loadCharObject(loadedModules['packageData/data/pinyin.js']);
-        var w1 = engine.loadWordObject(loadedModules['packagePhrase/data/phrase.js']);
-        var w2 = engine.loadWordObject(loadedModules['packageData/data/zdic.js']);
-
-        self.globalData.engine = engine;
-        self.globalData.wordCount = w1 + w2;
-
-        /* 预解码字体分片缓存，便于 PDF 立即使用 */
-        try {
-          var b64 = loadedModules['packageFontA/font-part1.js'] +
-                    loadedModules['packageFontB/font-part2.js'] +
-                    loadedModules['packageFontA/font-part3.js'];
-          fontBytes = base64.decode(b64);
-          self.globalData.fontBytes = fontBytes;
-        } catch (e) { fontBytes = null; }
-
-        loadedReady = true;
-        self.globalData.ready = true;
-      } catch (e) {
-        self.globalData.loadError = e;
-      }
-      /* 无论成败都通知所有页面，避免永远停在"加载中" */
-      _fireReady(self.globalData);
-    }, function (err) {
-      self.globalData.loadError = err;
-      _fireReady(self.globalData);
-    });
+    _startLoad(self);
   },
 
   /**
@@ -191,5 +212,17 @@ App({
       return;
     }
     if (typeof cb === 'function') readyCallbacks.push(cb);
+  },
+
+  /**
+   * 加载失败后重试：清空分包 Promise 缓存，重新 loadSubpackage + 初始化。
+   * 页面可传入新的回调（如 retry 后刷新 UI）。
+   */
+  reload: function (cb) {
+    subpackagePromises = {};
+    loadedModules = {};
+    this.globalData.loadedModules = loadedModules;
+    if (typeof cb === 'function') readyCallbacks.push(cb);
+    _startLoad(this);
   }
 });

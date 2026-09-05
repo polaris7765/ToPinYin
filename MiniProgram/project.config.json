@@ -42,15 +42,14 @@
     "showES6CompileOption": false,
     "useCompilerPlugins": false
   },
-  "compileType": "game",
+  "compileType": "miniprogram",
   "libVersion": "3.4.10",
   "appid": "wxfa28f4746f20a888",
   "projectname": "pinyin-assistant",
-  "miniprogramRoot": "",
+  "miniprogramRoot": "./",
   "condition": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",
     "tabSize": 2
-  },
-  "simulatorPluginLibVersion": {}
+  }
 }

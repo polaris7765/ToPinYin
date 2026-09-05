@@ -67,6 +67,7 @@ Page({
 
     /* 运行时状态 */
     ready: false,
+    loadFailed: false,
     resultReady: false,
     wordCount: 0,
     status: '正在初始化…',
@@ -185,14 +186,31 @@ Page({
   /* 拼音引擎加载完成 */
   _onReady: function (gd) {
     if (!gd || gd.loadError) {
-      this.setData({ status: '拼音库加载失败，请重启小程序重试。' });
+      var msg = (gd && gd.loadError && gd.loadError.message)
+        ? gd.loadError.message
+        : (gd && gd.loadError ? String(gd.loadError) : '未知错误');
+      this._loadError = (gd ? gd.loadError : null);
+      this.setData({
+        ready: false,
+        loadFailed: true,
+        status: '拼音库加载失败：' + msg + '。可点下方「重试加载」。'
+      });
       return;
     }
     this.setData({
       ready: true,
+      loadFailed: false,
       wordCount: gd.wordCount || 0,
       status: t('output.statusEngineReady', { n: gd.wordCount || 0 })
     });
+  },
+
+  /* 加载失败后「重试加载」：重新拉起分包并初始化引擎 */
+  onRetry: function () {
+    if (this.data.ready) return;
+    this.setData({ loadFailed: false, status: '正在重新加载拼音库…' });
+    var self = this;
+    app.reload(function (gd) { self._onReady(gd); });
   },
 
   /* ---------------- 表单事件 ---------------- */

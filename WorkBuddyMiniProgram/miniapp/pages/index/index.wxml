@@ -61,7 +61,8 @@
       <switch checked="{{uAsV}}" bindchange="onUVChange" color="#3B6EF6" />
     </view>
     <view class="btn-row">
-      <view class="btn btn-primary tap {{!ready ? 'disabled' : ''}}" hover-class="none" bindtap="onConvert">{{i18n.convertLabel}}</view>
+      <view wx:if="{{loadFailed}}" class="btn btn-primary tap" hover-class="none" bindtap="onRetry">重试加载</view>
+      <view wx:else class="btn btn-primary tap {{!ready ? 'disabled' : ''}}" hover-class="none" bindtap="onConvert">{{i18n.convertLabel}}</view>
       <view class="btn btn-ghost tap" hover-class="none" bindtap="onClear">{{i18n.clearLabel}}</view>
     </view>
   </view>
