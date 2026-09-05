@@ -113,6 +113,7 @@ Page({
     /* 注册 settings / i18n 监听 */
     var self = this;
     settings.onChange(function () {
+      self._initTheme();
       self._initFromSettings();
       self._refreshI18n();
       if (self._result) self._render();

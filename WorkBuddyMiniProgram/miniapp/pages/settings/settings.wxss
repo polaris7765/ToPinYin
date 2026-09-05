@@ -5,3 +5,38 @@ page {
 .settings {
   padding-bottom: 80rpx;
 }
+
+/* 设置页分段按钮：不换行 */
+.segment-item {
+  white-space: nowrap;
+  padding: 12rpx 16rpx;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+/* 导出说明 */
+.settings-note-section {
+  margin-top: 12rpx;
+}
+.settings-note-row {
+  padding: 24rpx 28rpx;
+}
+.settings-note {
+  font-size: 26rpx;
+  color: var(--text-soft);
+  line-height: 1.6;
+}
+
+/* 设置值（语言选择等）：单行，防止被长文本撑开 */
+.settings-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 360rpx;
+  text-align: right;
+}
+
+/* 恢复默认按钮：文字不换行 */
+.settings-btn {
+  white-space: nowrap;
+}

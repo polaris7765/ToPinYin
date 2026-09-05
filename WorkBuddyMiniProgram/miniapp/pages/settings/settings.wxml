@@ -11,17 +11,12 @@
         mode="selector"
         range="{{rows[0].options}}"
         range-key="label"
-        value="{{rows[0].value === 'zh-CN' ? 0 : (rows[0].value === 'zh-TW' ? 1 : (rows[0].value === 'en' ? 2 : 3))}}"
+        value="{{rows[0].pickerIndex}}"
         data-key="{{rows[0].valueKey}}"
         data-options="{{rows[0].options}}"
         bindchange="onPickerChange"
       >
-        <view class="settings-value">
-          <text wx:if="{{rows[0].value === 'zh-CN'}}">{{rows[0].options[0].label}}</text>
-          <text wx:elif="{{rows[0].value === 'zh-TW'}}">{{rows[0].options[1].label}}</text>
-          <text wx:elif="{{rows[0].value === 'en'}}">{{rows[0].options[2].label}}</text>
-          <text wx:elif="{{rows[0].value === 'ja'}}">{{rows[0].options[3].label}}</text>
-        </view>
+        <view class="settings-value">{{rows[0].displayValue}}</view>
       </picker>
     </view>
   </view>
@@ -33,7 +28,7 @@
     <!-- 字号 -->
     <view class="settings-row first">
       <view class="settings-label">{{rows[1].label}}</view>
-      <view class="settings-value" style="flex:0 0 auto;">
+      <view class="settings-value">
         <view style="display:flex; gap:8rpx;">
           <view
             wx:for="{{rows[1].options}}" wx:key="key" wx:for-item="o"
@@ -50,7 +45,7 @@
     <!-- 主题 -->
     <view class="settings-row">
       <view class="settings-label">{{rows[2].label}}</view>
-      <view class="settings-value" style="flex:0 0 auto;">
+      <view class="settings-value">
         <view style="display:flex; gap:8rpx;">
           <view
             wx:for="{{rows[2].options}}" wx:key="key" wx:for-item="o"
@@ -78,7 +73,7 @@
     <!-- 默认声调 -->
     <view class="settings-row first">
       <view class="settings-label">{{rows[4].label}}</view>
-      <view class="settings-value" style="flex:0 0 auto;">
+      <view class="settings-value">
         <view style="display:flex; gap:8rpx;">
           <view
             wx:for="{{rows[4].options}}" wx:key="key" wx:for-item="o"
@@ -95,7 +90,7 @@
     <!-- 默认显示 -->
     <view class="settings-row">
       <view class="settings-label">{{rows[5].label}}</view>
-      <view class="settings-value" style="flex:0 0 auto;">
+      <view class="settings-value">
         <view style="display:flex; gap:8rpx;">
           <view
             wx:for="{{rows[5].options}}" wx:key="key" wx:for-item="o"
@@ -125,5 +120,13 @@
   <!-- 恢复默认 -->
   <view class="settings-actions">
     <view class="settings-btn ghost tap" hover-class="none" bindtap="reset">{{i18n.resetLabel}}</view>
+  </view>
+
+  <!-- 导出说明 -->
+  <view class="settings-section settings-note-section">
+    <view class="settings-section-title">{{i18n.exportNoteTitle}}</view>
+    <view class="settings-note-row">
+      <text class="settings-note">{{i18n.exportNoteDocx}}</text>
+    </view>
   </view>
 </view>

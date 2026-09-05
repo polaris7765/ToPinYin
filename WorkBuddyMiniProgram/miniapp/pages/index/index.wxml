@@ -1,6 +1,6 @@
-<view class="container" style="{{themeStyle}}">
+<view class="container home" style="{{themeStyle}}">
 
-  <!-- 顶部品牌栏（含设置按钮） -->
+  <!-- 顶部品牌栏（含设置/关于按钮） -->
   <view class="header" style="padding-right: {{headerRightPad}}px;">
     <view class="header-icon">拼</view>
     <view class="header-text">
@@ -12,13 +12,13 @@
         <text class="header-btn-icon">ⓘ</text>
       </view>
       <view class="header-btn tap" hover-class="none" catchtap="goSettings">
-        <text class="header-btn-icon">⚙</text>
+        <text class="header-btn-icon icon-gear">⚙</text>
       </view>
     </view>
   </view>
 
   <!-- 输入卡片 -->
-  <view class="card">
+  <view class="card input-card">
     <view class="card-title-row">
       <text class="card-title">{{i18n.inputTitle}}</text>
       <text class="card-count">{{charCount}}</text>
@@ -56,10 +56,6 @@
         >{{item.label}}</view>
       </view>
     </view>
-    <view class="uv-row">
-      <text class="uv-label">{{i18n.uvLabel}}</text>
-      <switch checked="{{uAsV}}" bindchange="onUVChange" color="#3B6EF6" />
-    </view>
     <view class="btn-row">
       <view wx:if="{{loadFailed}}" class="btn btn-primary tap" hover-class="none" bindtap="onRetry">重试加载</view>
       <view wx:else class="btn btn-primary tap {{!ready ? 'disabled' : ''}}" hover-class="none" bindtap="onConvert">{{i18n.convertLabel}}</view>
@@ -68,7 +64,7 @@
   </view>
 
   <!-- 输出卡片 -->
-  <view class="card">
+  <view class="card output-card">
     <view class="card-title-row">
       <text class="card-title">{{i18n.outputTitle}}</text>
       <text wx:if="{{wordCount > 0}}" class="card-count">{{wordCount}} 词</text>
@@ -108,7 +104,5 @@
     </view>
     <view class="status-bar">{{status}}</view>
   </view>
-
-  <view class="privacy-tip">{{i18n.privacy}}</view>
 
 </view>

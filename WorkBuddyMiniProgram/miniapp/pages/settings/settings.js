@@ -47,14 +47,16 @@ Page({
         confirmBody: t('toast.restored'),
         cancelText: t('common.cancel'),
         confirmText: t('common.confirm'),
+        exportNoteTitle: t('settings.exportNoteTitle'),
+        exportNoteDocx: t('settings.exportNoteDocx'),
       },
     });
     this._renderRows();
 
     var self = this;
     if (!this._wired) {
-      settings.onChange(function () { self._renderRows(); });
-      i18n.onChange(function () { self._renderRows(); self.setData({ themeStyle: theme.refresh() }); });
+      settings.onChange(function () { self._init(); });
+      i18n.onChange(function () { self._init(); });
       this._wired = true;
     }
     wx.setNavigationBarTitle({ title: t('settings.title') });
@@ -68,6 +70,22 @@ Page({
     var fontKey = ['settings.fontSize.small', 'settings.fontSize.medium', 'settings.fontSize.large'];
     var themeKey = ['settings.theme.light', 'settings.theme.dark', 'settings.theme.system'];
 
+    var langOptions = [
+      { key: 'zh-CN', label: t('settings.language.zh-CN') },
+      { key: 'zh-TW', label: t('settings.language.zh-TW') },
+      { key: 'en',    label: t('settings.language.en') },
+      { key: 'ja',    label: t('settings.language.ja') },
+      { key: 'fr',    label: t('settings.language.fr') },
+      { key: 'es',    label: t('settings.language.es') },
+      { key: 'pt',    label: t('settings.language.pt') },
+      { key: 'ko',    label: t('settings.language.ko') },
+      { key: 'hi',    label: t('settings.language.hi') },
+    ];
+    var langIdx = 0;
+    for (var li = 0; li < langOptions.length; li++) {
+      if (langOptions[li].key === s.lang) { langIdx = li; break; }
+    }
+
     this.setData({
       sections: [
         { id: 'general', title: t('settings.section.general') },
@@ -77,18 +95,10 @@ Page({
       rows: [
         /* 通用 */
         { section: 'general', kind: 'picker-group', label: t('settings.language'),
-          options: [
-            { key: 'zh-CN', label: t('settings.language.zh-CN') },
-            { key: 'zh-TW', label: t('settings.language.zh-TW') },
-            { key: 'en',    label: t('settings.language.en') },
-            { key: 'ja',    label: t('settings.language.ja') },
-            { key: 'fr',    label: t('settings.language.fr') },
-            { key: 'es',    label: t('settings.language.es') },
-            { key: 'pt',    label: t('settings.language.pt') },
-            { key: 'ko',    label: t('settings.language.ko') },
-            { key: 'hi',    label: t('settings.language.hi') },
-          ],
-          valueKey: 'lang', value: s.lang },
+          options: langOptions,
+          valueKey: 'lang', value: s.lang,
+          pickerIndex: langIdx,
+          displayValue: t('settings.language.' + s.lang) || s.lang },
 
         /* 外观 */
         { section: 'appearance', kind: 'segment', label: t('settings.fontSize'),

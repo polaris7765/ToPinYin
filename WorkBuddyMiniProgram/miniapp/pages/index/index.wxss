@@ -1,8 +1,118 @@
-/* 主页面局部样式：复用全局 app.wxss */
+/* 主页面局部样式：复用全局 app.wxss，并针对「一屏内完整显示」做覆盖 */
 page {
   background: var(--bg, #F3F5FA);
-  /* 容纳页面级主题变量后，让 page 容器也可继承 */
 }
-.container {
+
+/* 主页容器：一屏固定，禁止整页滚动；仅输出区内部滚动 */
+.home {
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+/* 顶部品牌栏更紧凑，操作按钮更大 */
+.home .header {
+  flex: 0 0 auto;
+  margin-top: 16rpx;
+  height: 108rpx;
+  padding: 0 20rpx;
+}
+.home .header-icon {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 14rpx;
+  font-size: 32rpx;
+  margin-right: 16rpx;
+}
+.home .header-title {
+  font-size: 30rpx;
+}
+.home .header-sub {
+  font-size: 22rpx;
+}
+/* 卡片公共：更紧凑 */
+.home .card {
+  flex: 0 0 auto;
+  padding: 24rpx;
+  margin-top: 16rpx;
+}
+.home .card-title-row {
+  margin-bottom: 14rpx;
+}
+
+/* 输入卡片 */
+.home .input-card {
+  margin-top: 16rpx;
+}
+.home .input-area {
+  height: 180rpx;
+  padding: 16rpx 18rpx;
+}
+.home .option-row {
+  margin-top: 14rpx;
+}
+.home .option-label {
+  font-size: 26rpx;
+  width: 80rpx;
+}
+.home .segment-item {
+  font-size: 24rpx;
+  padding: 10rpx 0;
+}
+.home .btn-row {
+  margin-top: 18rpx;
+  gap: 16rpx;
+}
+.home .btn {
+  padding: 18rpx 0;
+  font-size: 28rpx;
+}
+
+/* 输出卡片：占据剩余空间，内部滚动 */
+.home .output-card {
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.home .output-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  height: auto;
+  padding: 16rpx;
+}
+.home .export-row {
+  margin-top: 16rpx;
+  gap: 12rpx;
+}
+.home .export-btn {
+  padding: 16rpx 0;
+  font-size: 24rpx;
+}
+.home .status-bar {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  min-height: 28rpx;
+}
+
+/* 窄屏再压缩一点 */
+@media screen and (max-width: 360px) {
+  .home .header { height: 96rpx; }
+  .home .header-btn { width: 64rpx; height: 64rpx; }
+  .home .header-btn-icon { font-size: 34rpx; }
+  .home .input-area { height: 150rpx; }
+  .home .card { padding: 20rpx; }
+  .home .option-row { margin-top: 12rpx; }
+  .home .btn { padding: 16rpx 0; font-size: 26rpx; }
+  .home .export-btn { padding: 14rpx 0; font-size: 22rpx; }
+}
+
+/* 宽屏适度放大 */
+@media screen and (min-width: 600rpx) {
+  .home .header { height: 120rpx; }
+  .home .header-icon { width: 72rpx; height: 72rpx; font-size: 38rpx; }
+  .home .header-btn { width: 84rpx; height: 84rpx; }
+  .home .header-btn-icon { font-size: 44rpx; }
+  .home .input-area { height: 200rpx; }
 }
