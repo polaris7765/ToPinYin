@@ -23,12 +23,24 @@ Page({
     sections: [],          // 文案投影（动态刷新）
     rows: [],              // 当前所有可操作的设置项，WXML 通过 wx:for 渲染
     i18n: {},              // 静态文案：复位按钮 / 提示语
+    navTitle: '',          // 自定义导航栏标题
+    statusBarHeight: 0,    // 状态栏高度（px）
+    langPickerVisible: false, // 语言选择弹窗显隐
+    langPickerTemp: '',    // 弹窗内临时选中的语言 key
+    pickerTitle: '',       // 弹窗标题（按预览语言）
+    pickerCancel: '',      // 弹窗取消按钮（按预览语言）
+    pickerConfirm: '',    // 弹窗确认按钮（按预览语言）
   },
 
   /* 用来聚合显示实际数值的镜像 */
   _snapshot: null,
 
   onLoad: function () {
+    /* 读取状态栏高度，供自定义导航栏让出顶部 */
+    try {
+      var info = wx.getSystemInfoSync && wx.getSystemInfoSync();
+      this._statusBarHeight = (info && info.statusBarHeight) ? info.statusBarHeight : 0;
+    } catch (e) { this._statusBarHeight = 0; }
     this._init();
   },
 
@@ -41,6 +53,8 @@ Page({
       themeStyle: theme.refresh(),
       themeIsDark: theme.getTheme() === 'dark',
       wordCount: (app && app.globalData && app.globalData.wordCount) || 0,
+      statusBarHeight: this._statusBarHeight || 0,
+      navTitle: t('settings.title'),
       i18n: {
         resetLabel: t('common.reset'),
         confirmTitle: t('common.confirm'),
@@ -52,6 +66,9 @@ Page({
         aboutSectionTitle: t('settings.section.about'),
         aboutLabel: t('settings.about.appName'),
         aboutVersion: t('settings.about.version'),
+        langPickerTitle: t('settings.langPickerTitle'),
+        langPickerCancel: t('common.cancel'),
+        langPickerConfirm: t('common.confirm'),
       },
     });
     this._renderRows();
@@ -62,7 +79,6 @@ Page({
       i18n.onChange(function () { self._init(); });
       this._wired = true;
     }
-    wx.setNavigationBarTitle({ title: t('settings.title') });
   },
 
   _renderRows: function () {
@@ -146,17 +162,50 @@ Page({
     this._renderRows();
   },
 
-  onPickerChange: function (e) {
+  onLangPickerOpen: function () {
+    var s = settings.all();
+    var lang = s.lang;
+    this.setData({
+      langPickerVisible: true,
+      langPickerTemp: lang,
+      pickerTitle: i18n.tLang(lang, 'settings.langPickerTitle'),
+      pickerCancel: i18n.tLang(lang, 'common.cancel'),
+      pickerConfirm: i18n.tLang(lang, 'common.confirm'),
+    });
+  },
+
+  onLangPickerSelect: function (e) {
     var key = e.currentTarget.dataset.key;
-    var idx = Number(e.detail.value);
-    var opt = e.currentTarget.dataset.options;
-    if (!key || !opt || !opt[idx]) return;
-    settings.set(key, opt[idx].key);
+    if (!key) return;
+    this.setData({
+      langPickerTemp: key,
+      pickerTitle: i18n.tLang(key, 'settings.langPickerTitle'),
+      pickerCancel: i18n.tLang(key, 'common.cancel'),
+      pickerConfirm: i18n.tLang(key, 'common.confirm'),
+    });
+  },
+
+  onLangPickerCancel: function () {
+    this.setData({ langPickerVisible: false, langPickerTemp: '', pickerTitle: '', pickerCancel: '', pickerConfirm: '' });
+  },
+
+  onLangPickerConfirm: function () {
+    var key = this.data.langPickerTemp;
+    if (!key) return;
+    settings.set('lang', key);
+    this.setData({ langPickerVisible: false, langPickerTemp: '', pickerTitle: '', pickerCancel: '', pickerConfirm: '' });
     this._renderRows();
   },
 
+  /* 阻止点击弹窗内容时冒泡到遮罩关闭 */
+  onPickerModalTap: function () { return; },
+
   goAbout: function () {
     wx.navigateTo({ url: '/pages/about/about' });
+  },
+
+  goBack: function () {
+    wx.navigateBack({ delta: 1, fail: function () { wx.switchTab({ url: '/pages/index/index' }); } });
   },
 
   reset: function () {

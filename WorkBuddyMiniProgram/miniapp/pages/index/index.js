@@ -110,16 +110,20 @@ Page({
     } catch (e) { this._headerRightPad = 24; }
     this._initTheme();
     this._initFromSettings();
+    this._refreshI18n();
+    this._refreshStatus();
     /* 注册 settings / i18n 监听 */
     var self = this;
     settings.onChange(function () {
       self._initTheme();
       self._initFromSettings();
       self._refreshI18n();
+      self._refreshStatus();
       if (self._result) self._render();
     });
     i18n.onChange(function () {
       self._refreshI18n();
+      self._refreshStatus();
       if (self._result) self._render();
     });
     app.onReady(this._onReady.bind(this));
@@ -181,6 +185,23 @@ Page({
       modeOptions: _buildModeOptions(),
     });
     wx.setNavigationBarTitle({ title: t('common.appName') });
+  },
+
+  /* 根据当前状态重新生成底部状态栏文本，确保与当前语言一致 */
+  _refreshStatus: function () {
+    var s = '';
+    if (this.data.loadFailed) {
+      var err = this._loadError;
+      var msg = (err && err.message) ? err.message : (err ? String(err) : '未知错误');
+      s = '拼音库加载失败：' + msg + '。可点下方「重试加载」。';
+    } else if (!this.data.ready) {
+      s = t('output.statusReady');
+    } else if (this._result && this._result.cjkCharCount) {
+      s = t('output.statusDone', { n: this._result.cjkCharCount });
+    } else {
+      s = t('output.statusEngineReady', { n: this.data.wordCount || 0 });
+    }
+    this.setData({ status: s });
   },
 
   /* 拼音引擎加载完成 */

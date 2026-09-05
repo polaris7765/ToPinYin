@@ -17,9 +17,16 @@ Page({
     i18n: {},
     wordCount: 0,
     themeStyle: '',
+    navTitle: '',
+    statusBarHeight: 0,
   },
 
   onLoad: function () {
+    /* 读取状态栏高度，供自定义导航栏让出顶部 */
+    try {
+      var info = wx.getSystemInfoSync && wx.getSystemInfoSync();
+      this._statusBarHeight = (info && info.statusBarHeight) ? info.statusBarHeight : 0;
+    } catch (e) { this._statusBarHeight = 0; }
     this._render();
     var self = this;
     i18n.onChange(function () { self._render(); });
@@ -32,17 +39,24 @@ Page({
     this.setData({
       themeStyle: theme.refresh(),
       wordCount: (app && app.globalData && app.globalData.wordCount) || 0,
+      statusBarHeight: this._statusBarHeight || 0,
+      navTitle: t('settings.section.about'),
       i18n: {
-        appName:  t('settings.about.appName'),
-        version:  t('settings.about.version'),
-        engine:   t('settings.about.engine', { n: this.data.wordCount || (app && app.globalData && app.globalData.wordCount) || 0 }),
-        privacy:  t('settings.about.privacy'),
-        feedback: t('settings.about.feedback'),
-        license:  t('settings.about.license'),
-        github:   t('settings.about.github'),
+        appName:     t('settings.about.appName'),
+        version:     t('settings.about.version'),
+        engine:      t('settings.about.engine', { n: this.data.wordCount || (app && app.globalData && app.globalData.wordCount) || 0 }),
+        privacy:     t('settings.about.privacy'),
+        feedback:    t('settings.about.feedback'),
+        license:     t('settings.about.license'),
+        github:      t('settings.about.github'),
+        sectionTitle: t('settings.about.sectionTitle'),
+        copyInfo:    t('settings.about.copyInfo'),
       }
     });
-    wx.setNavigationBarTitle({ title: t('settings.section.about') });
+  },
+
+  goBack: function () {
+    wx.navigateBack({ delta: 1, fail: function () { wx.switchTab({ url: '/pages/index/index' }); } });
   },
 
   copyFeedback: function () {

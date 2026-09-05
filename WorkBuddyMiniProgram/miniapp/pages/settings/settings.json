@@ -1,5 +1,4 @@
 {
-  "navigationBarTitleText": "设置",
-  "navigationBarTextStyle": "white",
+  "navigationStyle": "custom",
   "usingComponents": {}
 }

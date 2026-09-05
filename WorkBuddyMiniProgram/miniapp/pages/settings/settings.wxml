@@ -1,141 +1,168 @@
-<view class="settings" style="{{themeStyle}}">
+<view style="{{themeStyle}}">
 
-  <!-- 通用 -->
-  <view class="settings-section">
-    <view class="settings-section-title">{{sections[0].title}}</view>
-
-    <!-- 语言（仅此一个 picker 类型） -->
-    <view class="settings-row first">
-      <view class="settings-label">{{rows[0].label}}</view>
-      <picker
-        mode="selector"
-        range="{{rows[0].options}}"
-        range-key="label"
-        value="{{rows[0].pickerIndex}}"
-        data-key="{{rows[0].valueKey}}"
-        data-options="{{rows[0].options}}"
-        bindchange="onPickerChange"
-      >
-        <view class="settings-value">{{rows[0].displayValue}}</view>
-      </picker>
+  <!-- 自定义导航栏：状态栏高 + 蓝色背景 + 居中标题 -->
+  <view class="page-navbar" style="padding-top: {{statusBarHeight}}px;">
+    <view class="page-navbar-back tap" hover-class="none" bindtap="goBack">
+      <text class="page-navbar-back-icon">‹</text>
     </view>
+    <view class="page-navbar-title">{{navTitle}}</view>
+    <view class="page-navbar-spacer"></view>
   </view>
 
-  <!-- 外观 -->
-  <view class="settings-section">
-    <view class="settings-section-title">{{sections[1].title}}</view>
+  <view class="settings">
 
-    <!-- 字号 -->
-    <view class="settings-row first">
-      <view class="settings-label">{{rows[1].label}}</view>
-      <view class="settings-value">
-        <view style="display:flex; gap:8rpx;">
-          <view
-            wx:for="{{rows[1].options}}" wx:key="key" wx:for-item="o"
-            class="segment-item {{rows[1].value === o.key ? 'active' : ''}} tap"
-            hover-class="none"
-            data-key="{{rows[1].valueKey}}"
-            data-val="{{o.key}}"
-            bindtap="onSegmentPick"
-          >{{o.label}}</view>
-        </view>
+    <!-- 通用 -->
+    <view class="settings-section">
+      <view class="settings-section-title">{{sections[0].title}}</view>
+
+      <!-- 语言（自定义 picker 弹窗） -->
+      <view class="settings-row first tap" hover-class="none" bindtap="onLangPickerOpen">
+        <view class="settings-label">{{rows[0].label}}</view>
+        <view class="settings-value">{{rows[0].displayValue}} <text class="settings-chevron">›</text></view>
       </view>
     </view>
 
-    <!-- 主题 -->
-    <view class="settings-row">
-      <view class="settings-label">{{rows[2].label}}</view>
-      <view class="settings-value">
-        <view style="display:flex; gap:8rpx;">
-          <view
-            wx:for="{{rows[2].options}}" wx:key="key" wx:for-item="o"
-            class="segment-item {{rows[2].value === o.key ? 'active' : ''}} tap"
-            hover-class="none"
-            data-key="{{rows[2].valueKey}}"
-            data-val="{{o.key}}"
-            bindtap="onSegmentPick"
-          >{{o.label}}</view>
+    <!-- 外观 -->
+    <view class="settings-section">
+      <view class="settings-section-title">{{sections[1].title}}</view>
+
+      <!-- 字号 -->
+      <view class="settings-row first">
+        <view class="settings-label">{{rows[1].label}}</view>
+        <view class="settings-value">
+          <view style="display:flex; gap:8rpx;">
+            <view
+              wx:for="{{rows[1].options}}" wx:key="key" wx:for-item="o"
+              class="segment-item {{rows[1].value === o.key ? 'active' : ''}} tap"
+              hover-class="none"
+              data-key="{{rows[1].valueKey}}"
+              data-val="{{o.key}}"
+              bindtap="onSegmentPick"
+            >{{o.label}}</view>
+          </view>
         </view>
+      </view>
+
+      <!-- 主题 -->
+      <view class="settings-row">
+        <view class="settings-label">{{rows[2].label}}</view>
+        <view class="settings-value">
+          <view style="display:flex; gap:8rpx;">
+            <view
+              wx:for="{{rows[2].options}}" wx:key="key" wx:for-item="o"
+              class="segment-item {{rows[2].value === o.key ? 'active' : ''}} tap"
+              hover-class="none"
+              data-key="{{rows[2].valueKey}}"
+              data-val="{{o.key}}"
+              bindtap="onSegmentPick"
+            >{{o.label}}</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- ü→v -->
+      <view class="settings-row">
+        <view class="settings-label">{{rows[3].label}}</view>
+        <switch checked="{{rows[3].value}}" data-key="{{rows[3].valueKey}}" bindchange="onSwitchChange" color="#3B6EF6" />
       </view>
     </view>
 
-    <!-- ü→v -->
-    <view class="settings-row">
-      <view class="settings-label">{{rows[3].label}}</view>
-      <switch checked="{{rows[3].value}}" data-key="{{rows[3].valueKey}}" bindchange="onSwitchChange" color="#3B6EF6" />
-    </view>
-  </view>
+    <!-- 导出 -->
+    <view class="settings-section">
+      <view class="settings-section-title">{{sections[2].title}}</view>
 
-  <!-- 导出 -->
-  <view class="settings-section">
-    <view class="settings-section-title">{{sections[2].title}}</view>
-
-    <!-- 默认声调 -->
-    <view class="settings-row first">
-      <view class="settings-label">{{rows[4].label}}</view>
-      <view class="settings-value">
-        <view style="display:flex; gap:8rpx;">
-          <view
-            wx:for="{{rows[4].options}}" wx:key="key" wx:for-item="o"
-            class="segment-item {{rows[4].value === o.key ? 'active' : ''}} tap"
-            hover-class="none"
-            data-key="{{rows[4].valueKey}}"
-            data-val="{{o.key}}"
-            bindtap="onSegmentPick"
-          >{{o.label}}</view>
+      <!-- 默认声调 -->
+      <view class="settings-row first">
+        <view class="settings-label">{{rows[4].label}}</view>
+        <view class="settings-value">
+          <view style="display:flex; gap:8rpx;">
+            <view
+              wx:for="{{rows[4].options}}" wx:key="key" wx:for-item="o"
+              class="segment-item {{rows[4].value === o.key ? 'active' : ''}} tap"
+              hover-class="none"
+              data-key="{{rows[4].valueKey}}"
+              data-val="{{o.key}}"
+              bindtap="onSegmentPick"
+            >{{o.label}}</view>
+          </view>
         </view>
+      </view>
+
+      <!-- 默认显示 -->
+      <view class="settings-row">
+        <view class="settings-label">{{rows[5].label}}</view>
+        <view class="settings-value">
+          <view style="display:flex; gap:8rpx;">
+            <view
+              wx:for="{{rows[5].options}}" wx:key="key" wx:for-item="o"
+              class="segment-item {{rows[5].value === o.key ? 'active' : ''}} tap"
+              hover-class="none"
+              data-key="{{rows[5].valueKey}}"
+              data-val="{{o.key}}"
+              bindtap="onSegmentPick"
+            >{{o.label}}</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 自动打开 -->
+      <view class="settings-row">
+        <view class="settings-label">{{rows[6].label}}</view>
+        <switch checked="{{rows[6].value}}" data-key="{{rows[6].valueKey}}" bindchange="onSwitchChange" color="#3B6EF6" />
+      </view>
+
+      <!-- 保留历史 -->
+      <view class="settings-row">
+        <view class="settings-label">{{rows[7].label}}</view>
+        <switch checked="{{rows[7].value}}" data-key="{{rows[7].valueKey}}" bindchange="onSwitchChange" color="#3B6EF6" />
       </view>
     </view>
 
-    <!-- 默认显示 -->
-    <view class="settings-row">
-      <view class="settings-label">{{rows[5].label}}</view>
-      <view class="settings-value">
-        <view style="display:flex; gap:8rpx;">
-          <view
-            wx:for="{{rows[5].options}}" wx:key="key" wx:for-item="o"
-            class="segment-item {{rows[5].value === o.key ? 'active' : ''}} tap"
-            hover-class="none"
-            data-key="{{rows[5].valueKey}}"
-            data-val="{{o.key}}"
-            bindtap="onSegmentPick"
-          >{{o.label}}</view>
-        </view>
+    <!-- 恢复默认 -->
+    <view class="settings-actions">
+      <view class="settings-btn ghost tap" hover-class="none" bindtap="reset">{{i18n.resetLabel}}</view>
+    </view>
+
+    <!-- 导出说明 -->
+    <view class="settings-section settings-note-section">
+      <view class="settings-section-title">{{i18n.exportNoteTitle}}</view>
+      <view class="settings-note-row">
+        <text class="settings-note">{{i18n.exportNoteDocx}}</text>
       </view>
     </view>
 
-    <!-- 自动打开 -->
-    <view class="settings-row">
-      <view class="settings-label">{{rows[6].label}}</view>
-      <switch checked="{{rows[6].value}}" data-key="{{rows[6].valueKey}}" bindchange="onSwitchChange" color="#3B6EF6" />
+    <!-- 关于 -->
+    <view class="settings-section">
+      <view class="settings-section-title">{{i18n.aboutSectionTitle}}</view>
+      <view class="settings-row first tap" hover-class="none" bindtap="goAbout">
+        <view class="settings-label">{{i18n.aboutLabel}}</view>
+        <view class="settings-value">{{i18n.aboutVersion}} <text class="settings-chevron">›</text></view>
+      </view>
     </view>
 
-    <!-- 保留历史 -->
-    <view class="settings-row">
-      <view class="settings-label">{{rows[7].label}}</view>
-      <switch checked="{{rows[7].value}}" data-key="{{rows[7].valueKey}}" bindchange="onSwitchChange" color="#3B6EF6" />
+  </view>
+
+  <!-- 语言选择弹窗：自定义取消/确认文案（多语言） -->
+  <view wx:if="{{langPickerVisible}}" class="picker-mask" bindtap="onLangPickerCancel">
+    <view class="picker-modal" catchtap="onPickerModalTap">
+      <view class="picker-title">{{pickerTitle}}</view>
+      <scroll-view class="picker-list" scroll-y>
+        <view
+          wx:for="{{rows[0].options}}" wx:key="key" wx:for-item="o"
+          class="picker-item {{langPickerTemp === o.key ? 'active' : ''}} tap"
+          hover-class="none"
+          data-key="{{o.key}}"
+          bindtap="onLangPickerSelect"
+        >
+          <text class="picker-item-label">{{o.label}}</text>
+          <text wx:if="{{langPickerTemp === o.key}}" class="picker-item-check">✓</text>
+        </view>
+      </scroll-view>
+      <view class="picker-actions">
+        <view class="picker-btn cancel tap" hover-class="none" bindtap="onLangPickerCancel">{{pickerCancel}}</view>
+        <view class="picker-btn confirm tap" hover-class="none" bindtap="onLangPickerConfirm">{{pickerConfirm}}</view>
+      </view>
     </view>
   </view>
 
-  <!-- 恢复默认 -->
-  <view class="settings-actions">
-    <view class="settings-btn ghost tap" hover-class="none" bindtap="reset">{{i18n.resetLabel}}</view>
-  </view>
-
-  <!-- 导出说明 -->
-  <view class="settings-section settings-note-section">
-    <view class="settings-section-title">{{i18n.exportNoteTitle}}</view>
-    <view class="settings-note-row">
-      <text class="settings-note">{{i18n.exportNoteDocx}}</text>
-    </view>
-  </view>
-
-  <!-- 关于 -->
-  <view class="settings-section">
-    <view class="settings-section-title">{{i18n.aboutSectionTitle}}</view>
-    <view class="settings-row first tap" hover-class="none" bindtap="goAbout">
-      <view class="settings-label">{{i18n.aboutLabel}}</view>
-      <view class="settings-value">{{i18n.aboutVersion}} <text class="settings-chevron">›</text></view>
-    </view>
-  </view>
 </view>

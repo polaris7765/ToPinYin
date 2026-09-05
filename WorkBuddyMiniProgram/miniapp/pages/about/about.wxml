@@ -1,4 +1,15 @@
-<view class="settings" style="{{themeStyle}}">
+<view style="{{themeStyle}}">
+
+  <!-- 自定义导航栏：状态栏高 + 蓝色背景 + 居中标题 -->
+  <view class="page-navbar" style="padding-top: {{statusBarHeight}}px;">
+    <view class="page-navbar-back tap" hover-class="none" bindtap="goBack">
+      <text class="page-navbar-back-icon">‹</text>
+    </view>
+    <view class="page-navbar-title">{{navTitle}}</view>
+    <view class="page-navbar-spacer"></view>
+  </view>
+
+  <view class="settings">
   <view class="about-card">
     <view class="about-name">{{i18n.appName}}</view>
     <view class="about-version">{{i18n.version}}</view>
@@ -7,11 +18,11 @@
   </view>
 
   <view class="settings-section">
-    <view class="settings-section-title">反馈与信息</view>
+    <view class="settings-section-title">{{i18n.sectionTitle}}</view>
 
     <view class="settings-row first" bindtap="copyFeedback" hover-class="none">
       <view class="settings-label">{{i18n.feedback}}</view>
-      <view class="settings-value">复制应用信息</view>
+      <view class="settings-value">{{i18n.copyInfo}}</view>
     </view>
     <view class="settings-row" bindtap="openGithub" hover-class="none">
       <view class="settings-label">{{i18n.github}}</view>
@@ -23,10 +34,5 @@
     </view>
   </view>
 
-  <view class="about-card" style="text-align:center;">
-    <view style="font-size:22rpx;color:var(--text-muted);line-height:1.8;">
-      Made with ❤ for Chinese learners everywhere.<br/>
-      All conversion runs locally on your device.
-    </view>
   </view>
 </view>

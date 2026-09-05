@@ -1,3 +1,4 @@
+/* 关于页的 page-navbar 在外层根 view 下，默认就是满宽，无需负 margin */
 page {
   background: var(--bg);
 }
