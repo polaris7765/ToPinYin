@@ -1,0 +1,33 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "subpackages": [
+    {
+      "root": "packageData",
+      "name": "data"
+    },
+    {
+      "root": "packagePhrase",
+      "name": "phrase"
+    },
+    {
+      "root": "packageFontA",
+      "name": "fontA"
+    },
+    {
+      "root": "packageFontB",
+      "name": "fontB"
+    }
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#3B6EF6",
+    "navigationBarTitleText": "中文拼音助手",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F3F5FA",
+    "backgroundTextStyle": "light"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

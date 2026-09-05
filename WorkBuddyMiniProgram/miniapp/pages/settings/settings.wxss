@@ -1,0 +1,7 @@
+/* 局部样式补充 */
+page {
+  background: var(--bg);
+}
+.settings {
+  padding-bottom: 80rpx;
+}

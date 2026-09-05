@@ -1,0 +1,32 @@
+<view class="settings" style="{{themeStyle}}">
+  <view class="about-card">
+    <view class="about-name">{{i18n.appName}}</view>
+    <view class="about-version">{{i18n.version}}</view>
+    <view class="about-engine">{{i18n.engine}}</view>
+    <view class="about-line" style="margin-top:24rpx;">{{i18n.privacy}}</view>
+  </view>
+
+  <view class="settings-section">
+    <view class="settings-section-title">反馈与信息</view>
+
+    <view class="settings-row first" bindtap="copyFeedback" hover-class="none">
+      <view class="settings-label">{{i18n.feedback}}</view>
+      <view class="settings-value">复制应用信息</view>
+    </view>
+    <view class="settings-row" bindtap="openGithub" hover-class="none">
+      <view class="settings-label">{{i18n.github}}</view>
+      <view class="settings-value">—</view>
+    </view>
+    <view class="settings-row">
+      <view class="settings-label">{{i18n.license}}</view>
+      <view class="settings-value">MIT</view>
+    </view>
+  </view>
+
+  <view class="about-card" style="text-align:center;">
+    <view style="font-size:22rpx;color:var(--text-muted);line-height:1.8;">
+      Made with ❤ for Chinese learners everywhere.<br/>
+      All conversion runs locally on your device.
+    </view>
+  </view>
+</view>

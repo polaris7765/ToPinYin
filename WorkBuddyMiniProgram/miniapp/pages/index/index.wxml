@@ -1,0 +1,113 @@
+<view class="container" style="{{themeStyle}}">
+
+  <!-- 顶部品牌栏（含设置按钮） -->
+  <view class="header" style="padding-right: {{headerRightPad}}px;">
+    <view class="header-icon">拼</view>
+    <view class="header-text">
+      <view class="header-title">{{i18n.headerTitle}}</view>
+      <view class="header-sub">{{i18n.headerSubtitle}}</view>
+    </view>
+    <view class="header-actions">
+      <view class="header-btn tap" hover-class="none" catchtap="goAbout">
+        <text class="header-btn-icon">ⓘ</text>
+      </view>
+      <view class="header-btn tap" hover-class="none" catchtap="goSettings">
+        <text class="header-btn-icon">⚙</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 输入卡片 -->
+  <view class="card">
+    <view class="card-title-row">
+      <text class="card-title">{{i18n.inputTitle}}</text>
+      <text class="card-count">{{charCount}}</text>
+    </view>
+    <textarea
+      class="input-area"
+      value="{{input}}"
+      bindinput="onInput"
+      placeholder="{{i18n.inputPlaceholder}}"
+      maxlength="-1"
+      auto-height="{{false}}"
+      hold-keyboard="{{true}}"
+    />
+    <view class="option-row">
+      <text class="option-label">{{i18n.toneLabel}}</text>
+      <view class="segment">
+        <view
+          wx:for="{{toneOptions}}" wx:key="key"
+          class="segment-item {{toneIndex === index ? 'active' : ''}} tap"
+          hover-class="none"
+          data-index="{{index}}"
+          bindtap="onToneChange"
+        >{{item.label}}</view>
+      </view>
+    </view>
+    <view class="option-row">
+      <text class="option-label">{{i18n.modeLabel}}</text>
+      <view class="segment">
+        <view
+          wx:for="{{modeOptions}}" wx:key="key"
+          class="segment-item {{modeIndex === index ? 'active' : ''}} tap"
+          hover-class="none"
+          data-index="{{index}}"
+          bindtap="onModeChange"
+        >{{item.label}}</view>
+      </view>
+    </view>
+    <view class="uv-row">
+      <text class="uv-label">{{i18n.uvLabel}}</text>
+      <switch checked="{{uAsV}}" bindchange="onUVChange" color="#3B6EF6" />
+    </view>
+    <view class="btn-row">
+      <view class="btn btn-primary tap {{!ready ? 'disabled' : ''}}" hover-class="none" bindtap="onConvert">{{i18n.convertLabel}}</view>
+      <view class="btn btn-ghost tap" hover-class="none" bindtap="onClear">{{i18n.clearLabel}}</view>
+    </view>
+  </view>
+
+  <!-- 输出卡片 -->
+  <view class="card">
+    <view class="card-title-row">
+      <text class="card-title">{{i18n.outputTitle}}</text>
+      <text wx:if="{{wordCount > 0}}" class="card-count">{{wordCount}} 词</text>
+    </view>
+    <scroll-view class="output-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+      <!-- 逐字标注 -->
+      <block wx:if="{{modeIndex === 0}}">
+        <view wx:if="{{annLines.length === 0}}" class="empty-tip">{{i18n.emptyHint}}</view>
+        <view class="ann-line" wx:for="{{annLines}}" wx:key="id" wx:for-item="line">
+          <view class="ann-row">
+            <block wx:for="{{line.units}}" wx:key="id" wx:for-item="u">
+              <view wx:if="{{u.type === 'cjk'}}" class="ann-unit">
+                <text class="ann-pinyin">{{u.top}}</text>
+                <text class="ann-char">{{u.base}}</text>
+              </view>
+              <text wx:else class="ann-plain">{{u.text}}</text>
+            </block>
+          </view>
+        </view>
+      </block>
+      <!-- 行内对照 -->
+      <block wx:elif="{{modeIndex === 1}}">
+        <text wx:if="{{!inlineText}}" class="empty-tip">{{i18n.emptyHint}}</text>
+        <text wx:else class="inline-text" user-select>{{inlineText}}</text>
+      </block>
+      <!-- 仅拼音 -->
+      <block wx:else>
+        <text wx:if="{{!pinyinOnlyText}}" class="empty-tip">{{i18n.emptyHint}}</text>
+        <text wx:else class="pinyin-only-text" user-select>{{pinyinOnlyText}}</text>
+      </block>
+    </scroll-view>
+    <view class="export-row">
+      <view class="export-btn primary {{!resultReady ? 'disabled' : ''}} tap" hover-class="none" bindtap="onCopy">{{i18n.copyLabel}}</view>
+      <view class="export-btn light {{!resultReady ? 'disabled' : ''}} tap" hover-class="none" bindtap="onExportWord">{{i18n.exportWordLabel}}</view>
+      <view class="export-btn light {{!resultReady ? 'disabled' : ''}} tap" hover-class="none" bindtap="onExportPdf">{{i18n.exportPdfLabel}}</view>
+      <view class="export-btn ghost {{!resultReady ? 'disabled' : ''}} tap" hover-class="none" bindtap="onExportTxt">{{i18n.exportTextLabel}}</view>
+    </view>
+    <view class="status-bar">{{status}}</view>
+  </view>
+
+  <view class="privacy-tip">{{i18n.privacy}}</view>
+
+</view>

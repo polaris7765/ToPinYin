@@ -1,0 +1,8 @@
+/** 页面样式：大部分复用全局 app.wxss，此处仅补充页面细节 */
+page {
+  background: #F3F5FA;
+}
+
+.container {
+  min-height: 100vh;
+}

@@ -1,0 +1,103 @@
+<view class="container">
+
+  <!-- 顶部品牌栏 -->
+  <view class="header">
+    <view class="header-icon">拼</view>
+    <view>
+      <view class="header-title">中文拼音助手</view>
+      <view class="header-sub">中文 → 拼音（带声调）· 支持导出 Word / PDF</view>
+    </view>
+  </view>
+
+  <!-- 输入卡片 -->
+  <view class="card">
+    <view class="card-title-row">
+      <text class="card-title">输入中文</text>
+      <text class="card-count">{{charCount}}</text>
+    </view>
+    <textarea
+      class="input-area"
+      value="{{input}}"
+      bindinput="onInput"
+      placeholder="请输入中文，例如：你好，世界！&#10;支持多行输入、多音字智能消歧。"
+      maxlength="-1"
+      auto-height="{{false}}"
+    />
+    <view class="option-row">
+      <text class="option-label">声调</text>
+      <view class="segment">
+        <view
+          wx:for="{{toneOptions}}"
+          wx:key="*this"
+          class="segment-item {{toneIndex === index ? 'active' : ''}}"
+          data-index="{{index}}"
+          bindtap="onToneChange"
+        >{{item}}</view>
+      </view>
+    </view>
+    <view class="option-row">
+      <text class="option-label">显示</text>
+      <view class="segment">
+        <view
+          wx:for="{{modeOptions}}"
+          wx:key="*this"
+          class="segment-item {{modeIndex === index ? 'active' : ''}}"
+          data-index="{{index}}"
+          bindtap="onModeChange"
+        >{{item}}</view>
+      </view>
+    </view>
+    <view class="uv-row">
+      <text class="uv-label">ü 用 v 表示（输入法惯例）</text>
+      <switch checked="{{uAsV}}" bindchange="onUVChange" color="#3B6EF6" />
+    </view>
+    <view class="btn-row">
+      <view class="btn btn-primary {{!ready ? 'disabled' : ''}}" bindtap="onConvert">转 换</view>
+      <view class="btn btn-ghost" bindtap="onClear">清 空</view>
+    </view>
+  </view>
+
+  <!-- 输出卡片 -->
+  <view class="card">
+    <view class="card-title-row">
+      <text class="card-title">转换结果</text>
+    </view>
+    <scroll-view class="output-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+      <!-- 逐字标注：拼音在上、汉字在下 -->
+      <block wx:if="{{modeIndex === 0}}">
+        <view wx:if="{{annLines.length === 0}}" class="empty-tip">输入中文后点击「转换」<br/>拼音将显示在汉字上方</view>
+        <view class="ann-line" wx:for="{{annLines}}" wx:key="id" wx:for-item="line">
+          <view class="ann-row">
+            <block wx:for="{{line.units}}" wx:key="id" wx:for-item="u">
+              <view wx:if="{{u.type === 'cjk'}}" class="ann-unit">
+                <text class="ann-pinyin">{{u.top}}</text>
+                <text class="ann-char">{{u.base}}</text>
+              </view>
+              <text wx:else class="ann-plain">{{u.text}}</text>
+            </block>
+          </view>
+        </view>
+      </block>
+      <!-- 行内对照 -->
+      <block wx:elif="{{modeIndex === 1}}">
+        <text wx:if="{{!inlineText}}" class="empty-tip">输入中文后点击「转换」</text>
+        <text wx:else class="inline-text" user-select>{{inlineText}}</text>
+      </block>
+      <!-- 仅拼音 -->
+      <block wx:else>
+        <text wx:if="{{!pinyinOnlyText}}" class="empty-tip">输入中文后点击「转换」</text>
+        <text wx:else class="pinyin-only-text" user-select>{{pinyinOnlyText}}</text>
+      </block>
+    </scroll-view>
+    <view class="export-row">
+      <view class="export-btn primary {{!resultReady ? 'disabled' : ''}}" bindtap="onCopy">复制结果</view>
+      <view class="export-btn light {{!resultReady ? 'disabled' : ''}}" bindtap="onExportWord">导出 Word</view>
+      <view class="export-btn light {{!resultReady ? 'disabled' : ''}}" bindtap="onExportPdf">导出 PDF</view>
+      <view class="export-btn light {{!resultReady ? 'disabled' : ''}}" bindtap="onExportTxt">导出文本</view>
+    </view>
+    <view class="status-bar">{{status}}</view>
+  </view>
+
+  <view class="privacy-tip">本工具所有转换均在本地完成，不收集任何个人信息；导出的文件仅保存在你的设备中。</view>
+
+</view>

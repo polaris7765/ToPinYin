@@ -1,0 +1,8 @@
+/* 主页面局部样式：复用全局 app.wxss */
+page {
+  background: var(--bg, #F3F5FA);
+  /* 容纳页面级主题变量后，让 page 容器也可继承 */
+}
+.container {
+  min-height: 100vh;
+}
